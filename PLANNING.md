@@ -154,6 +154,136 @@ forgestudio/
 
 **关键点：** 协议使用通用属性名（如 `fit: "width"`），各生成插件维护自己的组件映射表，负责翻译为框架特定属性。
 
+### 3.4 开发约定与技术规范
+
+以下约定在开发前必须明确，否则会阻塞实现或导致返工。
+
+#### 3.4.1 组件嵌套规则
+
+不是所有组件都能互相嵌套。`ComponentMeta` 中的 `allowChildren` 控制是否可放入子组件，但还需要一张白名单控制「谁能放进谁」：
+
+| 父组件 | 允许的子组件 | 说明 |
+|--------|------------|------|
+| Page | View, Text, Image, Button, Input, List, Card | 页面根容器，接受所有组件 |
+| View | View, Text, Image, Button, Input, List, Card | 通用容器 |
+| List | Card, View | 列表容器，children 作为循环模板 |
+| Card | View, Text, Image, Button, Input | 卡片容器 |
+| Text | — | 叶子节点，不允许子组件 |
+| Image | — | 叶子节点 |
+| Button | — | 叶子节点 |
+| Input | — | 叶子节点 |
+
+在 `ComponentMeta` 中新增字段：
+
+```typescript
+interface ComponentMeta {
+  // ...已有字段
+  allowChildren: boolean
+  allowedChildComponents?: string[]  // 为空表示接受所有，undefined 同理
+  // 示例：List 的 allowedChildComponents = ['Card', 'View']
+}
+```
+
+拖拽引擎在 drop 时校验此规则，不合法的放置操作不生效。
+
+#### 3.4.2 样式系统
+
+**支持的 CSS 属性白名单（M1 阶段）：**
+
+| 分类 | 属性 | 类型 |
+|------|------|------|
+| 尺寸 | width, height, minHeight | number (px) |
+| 间距 | margin, marginTop/Right/Bottom/Left, padding, padding* | number (px) |
+| 背景 | backgroundColor | color |
+| 文字 | fontSize, fontWeight, color, textAlign, lineHeight | number/enum/color |
+| 边框 | borderRadius, borderWidth, borderColor | number/color |
+| 布局 | display(flex), flexDirection, justifyContent, alignItems, gap | enum |
+
+**样式编辑方式：** 属性面板分为两个 Tab——「属性」和「样式」。属性 Tab 展示 `propsSchema` 定义的业务属性，样式 Tab 展示上述白名单中的 CSS 属性。两者分别写入 `node.props` 和 `node.styles`。
+
+**单位约定：** 所有数值类型的样式值在协议中存储为纯数字（如 `fontSize: 32`），不带单位。代码生成器负责添加单位：Taro 生成 `px`（Taro 会自动转 rpx），UniApp 生成 `rpx`。
+
+#### 3.4.3 组件 ID 生成策略
+
+```typescript
+// 格式：组件名小写 + 下划线 + 自增序号
+// 示例：text_1, image_2, list_1, card_3
+function generateNodeId(componentName: string): string {
+  const counter = getNextCounter(componentName.toLowerCase())
+  return `${componentName.toLowerCase()}_${counter}`
+}
+```
+
+ID 会出现在生成代码的 className 中，所以必须是合法的 CSS 类名（小写字母 + 数字 + 下划线）。计数器在单个编辑会话内全局递增，不会重复。
+
+#### 3.4.4 画布渲染模式
+
+**决策：使用真实 DOM 渲染，不使用 iframe。**
+
+理由：
+- iframe 隔离虽然能避免样式污染，但拖拽交互跨 iframe 实现复杂
+- M1 阶段组件简单，样式污染风险低
+- 通过 CSS 命名空间（`.forge-canvas .text_1 { ... }`）隔离编辑器样式和组件样式
+
+编辑器自身样式使用 `forge-editor-` 前缀，组件渲染区域包裹在 `.forge-canvas` 容器内。
+
+#### 3.4.5 Taro 目标版本
+
+**M1 阶段锁定 Taro 4.x（最新稳定版）。**
+
+生成的 `package.json` 中固定版本：
+```json
+{
+  "@tarojs/cli": "4.0.x",
+  "@tarojs/taro": "4.0.x",
+  "@tarojs/components": "4.0.x",
+  "@tarojs/react": "4.0.x"
+}
+```
+
+如果 Taro 4.x 在开发期间有 breaking change，在 `codegen-taro` 的 `templates/` 目录中维护版本化的模板。
+
+#### 3.4.6 数据源响应格式约定
+
+**约定：数据源的 `mockData` 直接存储业务数据，不包含外层包装。**
+
+```json
+{
+  "id": "ds_goods",
+  "mockData": [
+    { "id": 1, "title": "商品1", "price": 99 },
+    { "id": 2, "title": "商品2", "price": 199 }
+  ]
+}
+```
+
+**代码生成器负责处理 API 响应的解包。** 默认约定 API 返回格式为 `{ code: 0, data: [...] }`，生成代码中使用 `res.data.data`：
+
+```tsx
+Taro.request({ url: '/api/goods', method: 'GET' })
+  .then(res => setGoodsList(res.data.data))
+```
+
+后续 M2 阶段可在数据源配置中增加「响应数据路径」字段（如 `responsePath: "data.data"`），让用户自定义解包路径。
+
+#### 3.4.7 表达式作用域规则
+
+| 表达式前缀 | 可用范围 | 含义 |
+|-----------|---------|------|
+| `{{$ds.xxx.data.field}}` | 任意组件 | 引用数据源返回的数据 |
+| `{{$item.field}}` | **仅限** List 的 children 内部 | 引用当前循环项 |
+| `{{$state.xxx}}` | 任意组件（M2 阶段） | 引用页面状态 |
+
+**校验规则：**
+- 编辑器在保存表达式时检查作用域。如果在 List 外部使用了 `{{$item.xxx}}`，显示红色警告：「$item 只能在列表组件内部使用」。
+- 代码生成器遇到非法表达式时，生成注释 `/* TODO: invalid expression */` 并使用空字符串兜底，不中断生成流程。
+
+**M1 阶段表达式限制：**
+- 只支持单层属性访问：`{{$item.title}}` ✅，`{{$item.detail.name}}` ❌
+- 不支持数组索引：`{{$item.tags[0]}}` ❌
+- 不支持函数调用和运算符：`{{$item.price * 100}}` ❌
+- 以上能力在 M2 阶段的完整表达式引擎中支持
+
 ---
 
 ## 四、里程碑路线图（5 个阶段）
@@ -178,18 +308,140 @@ M1 完成后，就能向合作方演示：拖一个列表组件，配一个 API�
 
 *目标：* 搭建工程基础，实现静态页面的拖拽搭建和协议导出。
 
-*范围：*
-- 搭建 Monorepo 工程（Turborepo + pnpm + Vite）
-- 定义 FSP 协议 v1.0 基础结构（组件树 + 属性 + 样式，暂不含数据源）
-- TypeScript 类型定义 + JSON Schema 校验
-- 拖拽画布（组件拖入、排序、选中、删除）
-- 属性面板（文本、数字、布尔、枚举、颜色 5 种 Setter）
-- 内置 6 个基础组件：Page、View、Text、Image、Button、Input
-- 画布内实时预览（静态渲染）
-- 协议导入/导出（JSON 文件）
+*开发任务清单：*
+
+**T1 - 工程初始化**
+- [ ] 初始化 Turborepo + pnpm workspace
+- [ ] 创建 `packages/protocol`、`packages/editor-core`、`packages/editor-ui`、`packages/renderer`、`packages/components`、`packages/shared`
+- [ ] 创建 `apps/web`（Vite + React 18 + TypeScript）
+- [ ] 配置 ESLint、Prettier、tsconfig 共享配置
+- [ ] 配置包间依赖和构建流程
+
+**T2 - FSP 协议 v1.0 定义（`packages/protocol`）**
+- [ ] 定义核心 TypeScript 类型：
+
+```typescript
+// packages/protocol/src/types.ts
+interface FSPSchema {
+  version: string
+  meta: { name: string; description?: string }
+  componentTree: ComponentNode
+}
+
+interface ComponentNode {
+  id: string
+  component: string          // 组件名：'Page' | 'View' | 'Text' | ...
+  props: Record<string, any> // 组件属性
+  styles: Record<string, any> // 样式
+  children?: ComponentNode[]
+}
+
+interface ComponentMeta {
+  name: string               // 组件名
+  title: string              // 中文显示名
+  icon: string               // 图标
+  category: 'basic' | 'layout' | 'data'
+  defaultProps: Record<string, any>
+  defaultStyles: Record<string, any>
+  propsSchema: PropDefinition[]  // 属性定义，驱动属性面板
+  allowChildren: boolean     // 是否允许子组件
+}
+
+interface PropDefinition {
+  name: string
+  title: string
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'color' | 'image'
+  default?: any
+  options?: { label: string; value: any }[]  // enum 类型的选项
+}
+```
+
+- [ ] 编写 JSON Schema 校验（基于 ajv）
+- [ ] 编写协议工具函数：`createNode()`、`findNodeById()`、`removeNode()`、`moveNode()`
+- [ ] 编写单元测试
+
+**T3 - 编辑器状态管理（`packages/editor-core`）**
+- [ ] 基于 Zustand 实现编辑器 Store：
+
+```typescript
+// packages/editor-core/src/store.ts
+interface EditorState {
+  schema: FSPSchema              // 当前协议数据
+  selectedNodeId: string | null  // 当前选中的组件 ID
+  // 操作方法
+  addNode: (parentId: string, node: ComponentNode, index?: number) => void
+  removeNode: (nodeId: string) => void
+  moveNode: (nodeId: string, targetParentId: string, index: number) => void
+  updateNodeProps: (nodeId: string, props: Partial<Record<string, any>>) => void
+  updateNodeStyles: (nodeId: string, styles: Partial<Record<string, any>>) => void
+  selectNode: (nodeId: string | null) => void
+  exportSchema: () => FSPSchema
+  importSchema: (schema: FSPSchema) => void
+}
+```
+
+**T4 - 编辑器 UI 布局（`apps/web`）**
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  工具栏：导入 | 导出 | 预览                                │
+├────────────┬─────────────────────────┬───────────────────┤
+│            │                         │                   │
+│  组件面板   │        画布区域          │    属性面板        │
+│  (240px)   │     (自适应宽度)         │    (320px)        │
+│            │                         │                   │
+│ ┌────────┐ │  ┌─────────────────┐   │  组件名称          │
+│ │ 基础组件 │ │  │                 │   │  ─────────        │
+│ │ ○ View  │ │  │   拖拽放置区域    │   │  属性配置          │
+│ │ ○ Text  │ │  │                 │   │  ┌─────────────┐  │
+│ │ ○ Image │ │  │   选中组件高亮    │   │  │ 文本内容     │  │
+│ │ ○ Button│ │  │   蓝色边框       │   │  │ [输入框]     │  │
+│ │ ○ Input │ │  │                 │   │  │ 字体颜色     │  │
+│ │         │ │  └─────────────────┘   │  │ [颜色选择器]  │  │
+│ └────────┘ │                         │  └─────────────┘  │
+│            │                         │                   │
+├────────────┴─────────────────────────┴───────────────────┤
+│  状态栏：组件数量 | 画布尺寸                                │
+└──────────────────────────────────────────────────────────┘
+```
+
+- [ ] 实现三栏布局（左：组件面板，中：画布，右：属性面板）
+- [ ] 组件面板：按分类展示组件列表，支持拖出
+- [ ] 画布区域：基于 dnd-kit 实现拖入和排序
+- [ ] 选中态：点击组件显示蓝色边框 + 操作按钮（删除）
+- [ ] 工具栏：导入/导出 JSON 按钮
+
+**T5 - 属性面板（`packages/props-panel`）**
+- [ ] 根据选中组件的 `ComponentMeta.propsSchema` 动态渲染表单
+- [ ] 实现 5 种 Setter 组件：
+
+| Setter | UI 形态 | 对应 prop type |
+|--------|---------|---------------|
+| StringSetter | 文本输入框 | `string` |
+| NumberSetter | 数字输入框（含步进器） | `number` |
+| BooleanSetter | Switch 开关 | `boolean` |
+| EnumSetter | 下拉选择框 | `enum` |
+| ColorSetter | 颜色选择器（预设色 + 自定义） | `color` |
+
+**T6 - 内置组件注册（`packages/components`）**
+
+| 组件 | 默认属性 | 可配置属性 |
+|------|---------|-----------|
+| Page | `title: "页面"` | title(string) |
+| View | — | padding(number), backgroundColor(color) |
+| Text | `content: "文本"` | content(string), fontSize(number), color(color), fontWeight(enum: normal/bold) |
+| Image | `src: "placeholder.png"` | src(image), fit(enum: contain/cover/fill/width), borderRadius(number) |
+| Button | `text: "按钮"` | text(string), type(enum: default/primary/warn), size(enum: default/mini) |
+| Input | `placeholder: "请输入"` | placeholder(string), type(enum: text/number/password), maxLength(number) |
+
+**T7 - 渲染器（`packages/renderer`）**
+- [ ] 实现编辑态渲染器：遍历 `componentTree`，将每个节点渲染为对应的 React 组件
+- [ ] 渲染器包裹层：每个组件外包一层 `<EditWrapper>`，处理选中、拖拽、hover 高亮
+- [ ] 空画布提示：「从左侧拖入组件开始搭建」
 
 *交付物：*
 - 可运行的编辑器，能拖拽搭建静态页面
+- `@forgestudio/protocol` npm 包
 - 导出的 FSP JSON 文件
 
 *演示场景：*
@@ -208,18 +460,121 @@ M1 完成后，就能向合作方演示：拖一个列表组件，配一个 API�
 
 *目标：* 实现 FSP → Taro 的代码生成，验证协议到代码的转换逻辑。
 
-*范围：*
-- 实现 `codegen-core`：协议解析 → 中间表示（IR）
-- 实现 `codegen-taro`：IR → Taro React TSX + SCSS（仅静态组件）
-- 生成完整 Taro 项目结构（页面、样式、配置文件、package.json）
-- 编辑器集成「生成代码」按钮
-- 代码预览面板（Monaco Editor）
-- 项目下载（zip 包）
-- 生成代码格式化（Prettier + ESLint）
+*开发任务清单：*
+
+**T1 - 代码生成核心（`packages/codegen-core`）**
+- [ ] 定义中间表示（IR）类型：
+
+```typescript
+// packages/codegen-core/src/ir.ts
+interface IRPage {
+  name: string
+  imports: IRImport[]       // import 语句
+  stateVars: IRStateVar[]   // 状态变量
+  effects: IREffect[]       // 副作用（M1.4 使用）
+  handlers: IRHandler[]     // 事件处理函数（M2 使用）
+  renderTree: IRRenderNode  // 渲染树
+  styles: IRStyleSheet      // 样式表
+}
+
+interface IRRenderNode {
+  tag: string               // 组件标签名
+  props: Record<string, IRExpression>
+  children: (IRRenderNode | IRTextContent)[]
+  className?: string
+}
+```
+
+- [ ] 实现协议解析器：`FSPSchema → IRPage`
+- [ ] 定义代码生成器插件接口：
+
+```typescript
+// packages/codegen-core/src/plugin.ts
+interface CodegenPlugin {
+  name: string                    // 'taro' | 'uniapp'
+  generate(ir: IRPage): GeneratedProject
+}
+
+interface GeneratedProject {
+  files: GeneratedFile[]          // 生成的文件列表
+}
+
+interface GeneratedFile {
+  path: string                    // 相对路径，如 'src/pages/index/index.tsx'
+  content: string                 // 文件内容
+}
+```
+
+**T2 - Taro 代码生成插件（`packages/codegen-taro`）**
+- [ ] 实现组件映射表：
+
+| FSP 组件 | Taro 组件 | import 来源 |
+|---------|----------|------------|
+| Page | View (根容器) | `@tarojs/components` |
+| View | View | `@tarojs/components` |
+| Text | Text | `@tarojs/components` |
+| Image | Image | `@tarojs/components` |
+| Button | Button | `@tarojs/components` |
+| Input | Input | `@tarojs/components` |
+
+- [ ] 实现 IR → TSX 代码生成（基于 @babel/types + @babel/generator）
+- [ ] 实现 IR → SCSS 样式文件生成
+- [ ] 生成 Taro 项目脚手架文件：
+
+```
+output/
+├── package.json              # 依赖：@tarojs/cli, @tarojs/taro, react
+├── tsconfig.json
+├── config/
+│   └── index.ts              # Taro 构建配置
+├── src/
+│   ├── app.ts                # 应用入口
+│   ├── app.config.ts         # 应用配置（页面路由）
+│   ├── app.scss
+│   └── pages/
+│       └── index/
+│           ├── index.tsx      # ← 生成的页面代码
+│           ├── index.scss     # ← 生成的样式
+│           └── index.config.ts
+└── project.config.json       # 微信小程序配置
+```
+
+- [ ] 生成代码示例（输入 → 输出）：
+
+输入协议片段：
+```json
+{
+  "id": "text_1",
+  "component": "Text",
+  "props": { "content": "Hello ForgeStudio" },
+  "styles": { "fontSize": 32, "color": "#333", "fontWeight": "bold" }
+}
+```
+
+输出 TSX：
+```tsx
+<Text className="text_1">Hello ForgeStudio</Text>
+```
+
+输出 SCSS：
+```scss
+.text_1 {
+  font-size: 32px;
+  color: #333;
+  font-weight: bold;
+}
+```
+
+**T3 - 编辑器集成**
+- [ ] 工具栏新增「生成 Taro 代码」按钮
+- [ ] 右侧新增「代码预览」Tab（与属性面板切换）
+- [ ] 代码预览面板：Monaco Editor 只读模式，展示生成的 TSX + SCSS
+- [ ] 文件树切换：可在生成的多个文件间切换查看
+- [ ] 「下载项目」按钮：使用 JSZip 打包为 zip 下载
 
 *交付物：*
 - 静态页面可生成可运行的 Taro 项目
-- 代码生成器 npm 包
+- `@forgestudio/codegen-core` + `@forgestudio/codegen-taro` npm 包
 
 *演示场景：*
 > 用 M1.1 的编辑器搭建一个商品展示页（静态内容）→
@@ -238,29 +593,158 @@ M1 完成后，就能向合作方演示：拖一个列表组件，配一个 API�
 
 *目标：* 增加数据绑定能力，支持动态列表渲染。
 
-*范围：*
-- FSP 协议升级：新增 `dataSources` 和表达式语法
-- 数据源管理面板（配置 API：URL + Method）
-- 基础表达式引擎（解析 `{{$ds.xxx.data.field}}` 和 `{{$item.field}}`）
-- 新增 List 组件（支持绑定数组数据源，循环渲染子组件）
-- 新增 Card 组件（数据卡片，用于 List 内部）
-- 编辑器内 Mock 数据预览（配置数据源后，用假数据渲染）
-- 属性面板新增 ExpressionSetter（简化版，手写表达式）
+*开发任务清单：*
+
+**T1 - 协议升级（`packages/protocol`）**
+- [ ] 扩展 FSPSchema 类型，新增数据源和表达式：
+
+```typescript
+// 新增到 FSPSchema
+interface FSPSchema {
+  // ...已有字段
+  dataSources?: DataSourceDef[]
+}
+
+interface DataSourceDef {
+  id: string                    // 数据源 ID，如 'ds_goods'
+  type: 'api'                   // M1 只支持 api 类型
+  options: {
+    url: string                 // API 地址
+    method: 'GET' | 'POST'
+    headers?: Record<string, string>
+  }
+  autoFetch: boolean            // 页面加载时自动请求
+  mockData?: any                // Mock 数据，用于编辑器预览
+}
+
+// 表达式约定：属性值为 string 且匹配 {{...}} 格式时视为表达式
+// 示例：
+// "content": "{{$ds.ds_goods.data.title}}"     → 绑定数据源字段
+// "content": "{{$item.title}}"                  → List 循环内绑定当前项
+// "content": "价格：¥{{$item.price}}"           → 混合文本 + 表达式
+```
+
+- [ ] 扩展 ComponentNode，新增循环绑定：
+
+```typescript
+interface ComponentNode {
+  // ...已有字段
+  loop?: {
+    dataSourceId: string        // 绑定的数据源 ID
+    itemName?: string           // 循环变量名，默认 '$item'
+  }
+}
+```
+
+**T2 - 基础表达式引擎（`packages/data-binding`）**
+- [ ] 实现表达式解析器：
+
+```typescript
+// packages/data-binding/src/parser.ts
+// 输入: "价格：¥{{$item.price}}"
+// 输出: [
+//   { type: 'literal', value: '价格：¥' },
+//   { type: 'expression', path: '$item.price' }
+// ]
+function parseExpression(template: string): ExpressionPart[]
+```
+
+- [ ] 实现表达式求值器（用于编辑器预览）：
+
+```typescript
+// packages/data-binding/src/evaluator.ts
+// 给定上下文 { $ds: { ds_goods: { data: [...] } }, $item: { price: 99 } }
+// 求值 "价格：¥{{$item.price}}" → "价格：¥99"
+function evaluate(template: string, context: Record<string, any>): any
+```
+
+**T3 - 数据源管理面板**
+- [ ] 属性面板新增「数据源」Tab：
+
+```
+┌─────────────────────┐
+│  数据源管理           │
+│  ┌─────────────────┐ │
+│  │ ds_goods    [编辑]│ │
+│  │ GET /api/goods   │ │
+│  └─────────────────┘ │
+│  [+ 添加数据源]       │
+│                      │
+│  ── 编辑数据源 ──     │
+│  名称: [ds_goods    ] │
+│  URL:  [/api/goods  ] │
+│  方法: [GET ▼]        │
+│  Mock 数据:           │
+│  ┌─────────────────┐ │
+│  │ [JSON 编辑器]    │ │
+│  └─────────────────┘ │
+│  [保存]  [取消]       │
+└─────────────────────┘
+```
+
+- [ ] Mock 数据编辑器（简单 JSON 文本框，后续可升级为可视化）
+
+**T4 - List 和 Card 组件**
+- [ ] List 组件 Meta 定义：
+
+```typescript
+const ListMeta: ComponentMeta = {
+  name: 'List',
+  title: '列表',
+  icon: 'list',
+  category: 'data',
+  allowChildren: true,          // 允许拖入子组件作为循环模板
+  defaultProps: {},
+  propsSchema: [
+    { name: 'dataSourceId', title: '数据源', type: 'enum', options: [] },
+    // options 动态填充为当前已配置的数据源列表
+  ],
+  defaultStyles: {}
+}
+```
+
+- [ ] Card 组件 Meta 定义：
+
+```typescript
+const CardMeta: ComponentMeta = {
+  name: 'Card',
+  title: '卡片',
+  icon: 'card',
+  category: 'data',
+  allowChildren: true,
+  defaultProps: {},
+  propsSchema: [
+    { name: 'padding', title: '内边距', type: 'number', default: 16 },
+    { name: 'borderRadius', title: '圆角', type: 'number', default: 8 },
+    { name: 'shadow', title: '阴影', type: 'boolean', default: true },
+  ],
+  defaultStyles: { backgroundColor: '#fff' }
+}
+```
+
+- [ ] 编辑器渲染器升级：遇到 `loop` 属性时，用 Mock 数据循环渲染 3 条
+
+**T5 - ExpressionSetter（简化版）**
+- [ ] 属性面板中，当属性值可绑定表达式时，显示绑定图标
+- [ ] 点击绑定图标，弹出表达式输入框（手写 `{{$item.xxx}}`）
+- [ ] 已绑定的属性显示绑定标识（如绿色图标）
 
 *交付物：*
 - 编辑器支持数据源配置和表达式绑定
 - List/Card 组件可用 Mock 数据预览
+- `@forgestudio/data-binding` npm 包
 
 *演示场景：*
-> 拖入 List 组件 → 配置数据源 `GET /api/goods` →
-> List 内拖入 Card → Card 的图片绑定 `{{$item.image}}`，标题绑定 `{{$item.title}}` →
-> 画布中用 Mock 数据显示 3 条商品卡片（编辑器内预览）
+> 拖入 List 组件 → 配置数据源 `GET /api/goods` → 填入 Mock 数据 →
+> List 内拖入 Card → Card 内拖入 Image 和 Text →
+> Image 的 src 绑定 `{{$item.image}}`，Text 绑定 `{{$item.title}}` →
+> 画布中用 Mock 数据显示 3 条商品卡片
 
 *验收标准：*
-- [ ] 可配置 API 数据源
-- [ ] List 组件绑定数据源后，画布用 Mock 数据渲染
+- [ ] 可配置 API 数据源并填写 Mock 数据
+- [ ] List 组件绑定数据源后，画布用 Mock 数据循环渲染
 - [ ] Card 内子组件可通过 `{{$item.xxx}}` 绑定字段
-- [ ] 导出的 FSP JSON 包含数据源定义
+- [ ] 导出的 FSP JSON 包含 dataSources 和 loop 定义
 
 ---
 
@@ -268,21 +752,129 @@ M1 完成后，就能向合作方演示：拖一个列表组件，配一个 API�
 
 *目标：* 升级代码生成器，支持数据绑定和 API 调用，跑通完整链路。
 
-*范围：*
-- 代码生成器升级：支持数据源和表达式
-- 生成 API 请求代码（基于 Taro.request）
-- 生成 useState、useEffect 状态管理代码
-- 生成 List 的 map 循环渲染代码
-- 生成数据加载逻辑（页面加载时自动调用 API）
+*开发任务清单：*
+
+**T1 - IR 扩展**
+- [ ] IRPage 新增 `effects`（数据请求副作用）和 `stateVars`（状态变量）
+- [ ] IRRenderNode 新增 `loop` 属性（循环渲染）
+- [ ] IRExpression 支持模板字符串（混合文本 + 变量）
+
+**T2 - 协议解析器升级（`packages/codegen-core`）**
+- [ ] 解析 `dataSources` → 生成 IR 的 stateVars + effects：
+
+```
+dataSources[0] = { id: "ds_goods", url: "/api/goods", autoFetch: true }
+  ↓ 解析为
+stateVars = [{ name: "goodsList", type: "array", default: [] }]
+effects = [{ trigger: "mount", action: "fetchApi", url: "/api/goods", target: "goodsList" }]
+```
+
+- [ ] 解析 `loop` → 生成 IR 的循环渲染节点
+- [ ] 解析 `{{$item.xxx}}` 表达式 → 生成 IR 的变量引用
+
+**T3 - Taro 代码生成器升级（`packages/codegen-taro`）**
+- [ ] 生成 useState 声明：
+
+```tsx
+const [goodsList, setGoodsList] = useState<any[]>([])
+```
+
+- [ ] 生成 useEffect + API 请求：
+
+```tsx
+useEffect(() => {
+  Taro.request({ url: '/api/goods', method: 'GET' })
+    .then(res => setGoodsList(res.data))
+}, [])
+```
+
+- [ ] 生成 List 的 map 循环：
+
+```tsx
+{goodsList.map((item, index) => (
+  <View key={index} className="card_1">
+    <Image src={item.image} className="img_1" />
+    <Text className="text_1">{item.title}</Text>
+    <Text className="text_2">¥{item.price}</Text>
+  </View>
+))}
+```
+
+- [ ] 完整生成代码示例（输入 → 输出）：
+
+输入协议：
+```json
+{
+  "dataSources": [
+    { "id": "ds_goods", "type": "api",
+      "options": { "url": "/api/goods", "method": "GET" },
+      "autoFetch": true }
+  ],
+  "componentTree": {
+    "id": "root", "component": "Page", "children": [
+      { "id": "list_1", "component": "List",
+        "loop": { "dataSourceId": "ds_goods" },
+        "children": [
+          { "id": "card_1", "component": "Card", "children": [
+            { "id": "img_1", "component": "Image",
+              "props": { "src": "{{$item.image}}" } },
+            { "id": "text_1", "component": "Text",
+              "props": { "content": "{{$item.title}}" } }
+          ]}
+        ]}
+    ]
+  }
+}
+```
+
+输出 TSX：
+```tsx
+import { View, Image, Text } from '@tarojs/components'
+import Taro, { useEffect, useState } from '@tarojs/taro'
+import './index.scss'
+
+export default function Index() {
+  const [goodsList, setGoodsList] = useState<any[]>([])
+
+  useEffect(() => {
+    Taro.request({ url: '/api/goods', method: 'GET' })
+      .then(res => setGoodsList(res.data.data))
+  }, [])
+
+  return (
+    <View className="page">
+      {goodsList.map((item, index) => (
+        <View key={index} className="card_1">
+          <Image src={item.image} className="img_1" />
+          <Text className="text_1">{item.title}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+```
+
+**T4 - Mock API 服务（用于演示）**
+- [ ] 创建简单的 Express 服务，提供 `GET /api/goods` 返回示例数据
+- [ ] 或使用 Mock Service Worker (MSW) 在浏览器端拦截请求
+- [ ] 示例数据：3-5 条商品（含 image、title、price 字段）
+
+**T5 - 端到端验证**
+- [ ] 在编辑器中完成完整操作流程
+- [ ] 生成的 Taro 项目在微信开发者工具中运行
+- [ ] 生成的 Taro 项目在 H5 模式下运行
+- [ ] 录制演示视频
 
 *交付物：*
 - 完整的动态页面代码生成能力
-- M1 完整演示 Demo
+- M1 完整演示 Demo（含录屏）
+- Mock API 服务
 
 *演示场景（M1 最终 Demo）：*
 > 打开编辑器 → 拖入 Image 作为 Banner →
-> 拖入 List 组件 → 配置 API `GET /api/goods` →
-> List 内拖入 Card → 绑定 `{{$item.image}}`、`{{$item.title}}`、`{{$item.price}}` →
+> 拖入 List 组件 → 配置 API `GET /api/goods` → 填入 Mock 数据 →
+> List 内拖入 Card → Card 内拖入 Image 和 Text →
+> 绑定 `{{$item.image}}`、`{{$item.title}}`、`{{$item.price}}` →
 > 画布中用 Mock 数据显示 3 条商品 →
 > 点击「生成 Taro 代码」→ 查看生成的 TSX（含 API 调用和 map 循环）→
 > 下载项目 → `npm install && npm run dev:weapp` →
@@ -293,6 +885,7 @@ M1 完成后，就能向合作方演示：拖一个列表组件，配一个 API�
 - [ ] 生成的代码可从真实 API 拉取数据并渲染
 - [ ] List 组件生成正确的 map 循环代码
 - [ ] 完整链路可演示：拖拽 → 绑定 → 生成 → 运行
+- [ ] 演示视频录制完成
 
 ---
 
@@ -551,11 +1144,11 @@ M1 (完整MVP) → M2 (数据+交互) → M3 (体验+模板)
 - 投资方（看好低代码 + 跨端赛道）
 
 **合作推进节奏：**
-1. **M2 完成后**：技术演示，验证合作意向
-2. **M3 完成后**：合作方提供真实业务场景试用
-3. **M4 完成后**：小范围推广，合作方参与用户测试
-4. **M5 完成后**：确定商业合作模式
-5. **M6 完成后**：正式商业化运营
+1. **M1 完成后**：技术演示，验证合作意向
+2. **M2 完成后**：合作方提供真实业务场景试用
+3. **M3 完成后**：小范围推广，合作方参与用户测试
+4. **M4 完成后**：确定商业合作模式
+5. **M5 完成后**：正式商业化运营
 
 ---
 
