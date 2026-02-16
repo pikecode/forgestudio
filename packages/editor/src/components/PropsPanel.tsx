@@ -9,6 +9,7 @@ import {
   BooleanSetter,
   EnumSetter,
   ColorSetter,
+  ExpressionSetter,
 } from '../setters'
 
 /** Find the ancestor List node that has a loop binding */
@@ -463,37 +464,28 @@ export function PropsPanel() {
         <>
           <div className="forge-editor-panel__section">条件渲染</div>
           <div style={{ padding: '8px 12px' }}>
-            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-              显示条件
-            </label>
-            <input
-              type="text"
-              placeholder="例如: {{inputValue}} 或留空始终显示"
+            <ExpressionSetter
+              label="显示条件"
               value={node.condition?.expression || ''}
-              onChange={(e) => {
-                const expr = e.target.value.trim()
-                if (expr) {
+              onChange={(expr) => {
+                const exprStr = String(expr).trim()
+                if (exprStr) {
                   updateNodeCondition(node.id, {
                     type: 'expression',
-                    expression: expr
+                    expression: exprStr
                   })
                 } else {
                   updateNodeCondition(node.id, undefined)
                 }
               }}
-              style={{
-                width: '100%',
-                padding: '4px 8px',
-                fontSize: 13,
-                border: '1px solid #d0d0d0',
-                borderRadius: 4
+              context={{
+                stateVars: schema.formStates?.map(fs => ({ id: fs.id, type: fs.type })) || [],
+                itemFields: loopAncestor ? getDataSourceFields(schema, loopAncestor.loop!.dataSourceId) : [],
+                dataSourceFields: schema.dataSources?.map(ds => ({ name: ds.id, dsId: ds.id })) || []
               }}
             />
             <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-              支持表达式：
-              <br />• {'{{'} 变量名 {'}}'} - 变量非空时显示
-              <br />• 变量名 - 直接使用变量（生成代码时）
-              <br />• count {'>'} 0 - 比较运算（仅生成代码）
+              使用可视化构建器选择变量和运算符，或切换到手动输入模式
             </div>
           </div>
         </>
