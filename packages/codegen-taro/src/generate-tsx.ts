@@ -161,9 +161,16 @@ ${pad}))}`
     nodeJSX = `${pad}<${taroTag}${propsStr}>\n${childrenStr}\n${pad}</${taroTag}>`
   }
 
-  // Wrap with condition if present
+  // Wrap with condition if present (supports complex expressions)
   if (node.condition) {
-    return `${pad}{${node.condition.expression} && (
+    // Convert FSP expression to JSX expression
+    // Replace $state.var -> var, $item.field -> item.field, $ds.name.data -> nameData
+    const jsxCondition = node.condition.expression
+      .replace(/\$state\.(\w+)/g, '$1')
+      .replace(/\$item\.(\w+)/g, 'item.$1')
+      .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+
+    return `${pad}{${jsxCondition} && (
 ${nodeJSX}
 ${pad})}`
   }

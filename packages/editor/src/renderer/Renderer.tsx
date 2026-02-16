@@ -207,21 +207,35 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
 export function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
   const schema = useEditorStore((s) => s.schema)
 
-  // Handle conditional rendering (M1.5)
+  // Build $state context from formStates
+  const stateContext: Record<string, any> = {}
+  if (schema.formStates) {
+    for (const fs of schema.formStates) {
+      stateContext[fs.id] = fs.defaultValue
+    }
+  }
+
+  // Merge context with $state
+  const fullContext: ExpressionContext = {
+    ...context,
+    $state: stateContext,
+  }
+
+  // Handle conditional rendering (M1.5) - now supports complex expressions
   if (node.condition) {
     const expr = node.condition.expression
-    // Evaluate condition - support {{varName}} syntax
     let shouldRender = false
-    if (expr.startsWith('{{') && expr.endsWith('}}')) {
-      const varName = expr.slice(2, -2).trim()
-      // Check formStates for the variable value
-      const formState = schema.formStates?.find(fs => fs.id === varName)
-      const value = formState?.defaultValue
-      // Truthy check: non-empty string, non-zero number, true boolean
-      shouldRender = !!value && value !== '' && value !== 0
-    } else {
-      // For now, treat non-template expressions as always true
-      shouldRender = true
+
+    // Wrap expression in {{}} if not already wrapped
+    const wrappedExpr = expr.startsWith('{{') ? expr : `{{${expr}}}`
+
+    try {
+      const result = evaluate(wrappedExpr, fullContext)
+      // Truthy check
+      shouldRender = !!result && result !== '' && result !== 0
+    } catch (e) {
+      console.warn('Failed to evaluate condition:', expr, e)
+      shouldRender = false
     }
 
     if (!shouldRender) {
@@ -295,7 +309,7 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
       <EditWrapper node={node}>
         <div style={node.styles as React.CSSProperties}>
           {items.map((item: any, index: number) => {
-            const itemContext: ExpressionContext = { $item: item, ...context }
+            const itemContext: ExpressionContext = { $item: item, ...fullContext }
             return (
               <div key={index} style={{ marginBottom: 4 }}>
                 {(node.children ?? []).map((child) => {
@@ -316,8 +330,8 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
 
   // Page is the root — don't wrap it in EditWrapper
   if (node.component === 'Page') {
-    return <>{renderComponent(node, context)}</>
+    return <>{renderComponent(node, fullContext)}</>
   }
 
-  return <EditWrapper node={node}>{renderComponent(node, context)}</EditWrapper>
+  return <EditWrapper node={node}>{renderComponent(node, fullContext)}</EditWrapper>
 }
