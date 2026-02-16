@@ -57,6 +57,8 @@ export interface DataSourceDef {
   }
   autoFetch: boolean
   mockData?: unknown
+  /** Dependencies: data sources that must be fetched before this one (M2) */
+  dependsOn?: string[]
 }
 
 /** Action types for event handlers (M1.4) */

@@ -16,6 +16,7 @@ export function DataSourcePanel() {
     url: '',
     method: 'GET' as 'GET' | 'POST',
     autoFetch: true,
+    dependsOn: [] as string[],
     mockData: `{
   "data": [
     {"id": 1, "title": "商品1", "description": "这是商品1的描述", "price": 99, "image": "https://via.placeholder.com/150"},
@@ -36,7 +37,7 @@ export function DataSourcePanel() {
 }`
 
   const resetForm = () => {
-    setFormData({ url: '', method: 'GET', autoFetch: true, mockData: defaultMockData })
+    setFormData({ url: '', method: 'GET', autoFetch: true, dependsOn: [], mockData: defaultMockData })
     setEditingId(null)
   }
 
@@ -51,6 +52,7 @@ export function DataSourcePanel() {
         },
         autoFetch: formData.autoFetch,
         mockData,
+        dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
       })
       resetForm()
     } catch (e) {
@@ -68,6 +70,7 @@ export function DataSourcePanel() {
         },
         autoFetch: formData.autoFetch,
         mockData,
+        dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
       })
       resetForm()
     } catch (e) {
@@ -81,6 +84,7 @@ export function DataSourcePanel() {
       url: ds.options.url,
       method: ds.options.method,
       autoFetch: ds.autoFetch,
+      dependsOn: ds.dependsOn || [],
       mockData: JSON.stringify(ds.mockData, null, 2),
     })
   }
@@ -269,6 +273,46 @@ export function DataSourcePanel() {
             自动获取
           </label>
         </div>
+
+        {/* Dependencies selector (M2) */}
+        {dataSources.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
+              依赖数据源
+            </label>
+            <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>
+              选择必须先加载的数据源（可多选）
+            </div>
+            {dataSources
+              .filter(ds => ds.id !== editingId) // Don't show self in dependencies
+              .map(ds => (
+                <label
+                  key={ds.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    marginBottom: 4,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.dependsOn.includes(ds.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, dependsOn: [...formData.dependsOn, ds.id] })
+                      } else {
+                        setFormData({ ...formData, dependsOn: formData.dependsOn.filter(id => id !== ds.id) })
+                      }
+                    }}
+                  />
+                  {ds.id}
+                </label>
+              ))}
+          </div>
+        )}
 
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>

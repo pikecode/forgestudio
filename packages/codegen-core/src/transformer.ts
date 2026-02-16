@@ -1,4 +1,4 @@
-import type { ComponentNode, FSPSchema, Action } from '@forgestudio/protocol'
+import type { ComponentNode, FSPSchema, Action, DataSourceDef } from '@forgestudio/protocol'
 import type {
   IRPage,
   IRRenderNode,
@@ -11,6 +11,47 @@ import type {
 } from './ir'
 import { camelToKebab, formatStyleValue } from './style-utils'
 
+/**
+ * Topological sort for data sources based on dependencies
+ * Returns sorted array where dependencies come before dependents
+ */
+function sortDataSourcesByDependency(dataSources: DataSourceDef[]): DataSourceDef[] {
+  const sorted: DataSourceDef[] = []
+  const visited = new Set<string>()
+  const visiting = new Set<string>()
+
+  function visit(ds: DataSourceDef) {
+    if (visited.has(ds.id)) return
+    if (visiting.has(ds.id)) {
+      // Circular dependency detected - just skip
+      console.warn(`Circular dependency detected for data source: ${ds.id}`)
+      return
+    }
+
+    visiting.add(ds.id)
+
+    // Visit dependencies first
+    if (ds.dependsOn) {
+      for (const depId of ds.dependsOn) {
+        const depDs = dataSources.find(d => d.id === depId)
+        if (depDs) {
+          visit(depDs)
+        }
+      }
+    }
+
+    visiting.delete(ds.id)
+    visited.add(ds.id)
+    sorted.push(ds)
+  }
+
+  for (const ds of dataSources) {
+    visit(ds)
+  }
+
+  return sorted
+}
+
 export function transformFSPtoIR(schema: FSPSchema): IRPage {
   const styleRules: IRStyleRule[] = []
   const stateVars: IRStateVar[] = []
@@ -18,8 +59,11 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
   const handlers: IRHandler[] = []
   let handlerCounter = 0
 
+  // Sort data sources by dependency (M2)
+  const sortedDataSources = sortDataSourcesByDependency(schema.dataSources ?? [])
+
   // Generate state vars and effects from data sources
-  for (const ds of schema.dataSources ?? []) {
+  for (const ds of sortedDataSources) {
     const varName = `${ds.id}Data`
     const raw = ds.mockData as any
     const mockData = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
@@ -31,9 +75,17 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
 
     if (ds.autoFetch) {
       const capitalizedName = varName.charAt(0).toUpperCase() + varName.slice(1)
+
+      // Build dependency wait logic if needed
+      let dependencyCheck = ''
+      if (ds.dependsOn && ds.dependsOn.length > 0) {
+        const depChecks = ds.dependsOn.map(depId => `${depId}Data.length > 0`).join(' && ')
+        dependencyCheck = `if (!(${depChecks})) return\n    `
+      }
+
       effects.push({
         trigger: 'mount',
-        body: `Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(() => {})`,
+        body: `${dependencyCheck}Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(() => {})`,
       })
     }
   }
