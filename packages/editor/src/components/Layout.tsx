@@ -5,6 +5,7 @@ import { ComponentPanel } from './ComponentPanel'
 import { Canvas } from './Canvas'
 import { PropsPanel } from './PropsPanel'
 import { CodePreviewPanel } from './CodePreviewPanel'
+import { DataSourcePanel } from './DataSourcePanel'
 import { Toolbar } from './Toolbar'
 
 export function EditorLayout() {
@@ -43,7 +44,9 @@ export function EditorLayout() {
         <div className="forge-editor__body">
           <ComponentPanel />
           <Canvas />
-          {rightPanelTab === 'props' ? <PropsPanel /> : <CodePreviewPanel />}
+          {rightPanelTab === 'props' && <PropsPanel />}
+          {rightPanelTab === 'datasource' && <DataSourcePanel />}
+          {rightPanelTab === 'code' && <CodePreviewPanel />}
         </div>
       </div>
       <DragOverlay>

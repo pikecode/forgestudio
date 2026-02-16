@@ -6,6 +6,8 @@ import {
   ImageMeta,
   ButtonMeta,
   InputMeta,
+  ListMeta,
+  CardMeta,
 } from './meta'
 
 const registry = new Map<string, ComponentMeta>()
@@ -21,6 +23,8 @@ register(TextMeta)
 register(ImageMeta)
 register(ButtonMeta)
 register(InputMeta)
+register(ListMeta)
+register(CardMeta)
 
 export function getComponentMeta(name: string): ComponentMeta | undefined {
   return registry.get(name)

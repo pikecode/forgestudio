@@ -5,11 +5,33 @@ import type {
   IRTextContent,
   IRStyleSheet,
   IRStyleRule,
+  IRStateVar,
+  IREffect,
 } from './ir'
 import { camelToKebab, formatStyleValue } from './style-utils'
 
 export function transformFSPtoIR(schema: FSPSchema): IRPage {
   const styleRules: IRStyleRule[] = []
+  const stateVars: IRStateVar[] = []
+  const effects: IREffect[] = []
+
+  // Generate state vars and effects from data sources
+  for (const ds of schema.dataSources ?? []) {
+    const varName = `${ds.id}Data`
+    stateVars.push({
+      name: varName,
+      type: 'any[]',
+      defaultValue: [],
+    })
+
+    if (ds.autoFetch) {
+      const capitalizedName = varName.charAt(0).toUpperCase() + varName.slice(1)
+      effects.push({
+        trigger: 'mount',
+        body: `Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' }).then(res => set${capitalizedName}(res.data.data || []))`,
+      })
+    }
+  }
 
   function transformNode(node: ComponentNode): IRRenderNode | null {
     // Collect styles into stylesheet
@@ -27,9 +49,15 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
     // Build children
     const children: (IRRenderNode | IRTextContent)[] = []
 
-    // Text content from props
+    // Text content from props (handle expressions)
     if (node.component === 'Text' && node.props.content) {
-      children.push({ type: 'text', value: String(node.props.content) })
+      const content = String(node.props.content)
+      if (content.includes('{{')) {
+        // Expression binding - will be handled by Taro generator
+        children.push({ type: 'text', value: content })
+      } else {
+        children.push({ type: 'text', value: content })
+      }
     }
     if (node.component === 'Button' && node.props.text) {
       children.push({ type: 'text', value: String(node.props.text) })
@@ -52,11 +80,20 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
     // Determine tag — Page becomes View (root wrapper)
     const tag = node.component === 'Page' ? 'View' : node.component
 
+    // Handle loop
+    let loopInfo: IRRenderNode['loop'] = undefined
+    if (node.loop) {
+      const dataVar = `${node.loop.dataSourceId}Data`
+      const itemVar = node.loop.itemName || 'item'
+      loopInfo = { dataVar, itemVar }
+    }
+
     return {
       tag,
       props: irProps,
       children,
       className: node.id,
+      loop: loopInfo,
     }
   }
 
@@ -65,8 +102,8 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
   return {
     name: schema.meta.name || 'index',
     imports: [],       // filled by the codegen plugin
-    stateVars: [],
-    effects: [],
+    stateVars,
+    effects,
     handlers: [],
     renderTree,
     styles: { rules: styleRules },

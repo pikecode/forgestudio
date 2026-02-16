@@ -9,6 +9,8 @@ const COMPONENT_MAP: Record<string, TaroComponentMapping> = {
   Image: { taroTag: 'Image', importSource: '@tarojs/components' },
   Button: { taroTag: 'Button', importSource: '@tarojs/components' },
   Input: { taroTag: 'Input', importSource: '@tarojs/components' },
+  List: { taroTag: 'View', importSource: '@tarojs/components' },
+  Card: { taroTag: 'View', importSource: '@tarojs/components' },
 }
 
 export function getTaroMapping(tag: string): TaroComponentMapping {

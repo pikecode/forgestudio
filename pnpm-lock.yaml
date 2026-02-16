@@ -79,6 +79,12 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  packages/data-binding:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/editor:
     dependencies:
       '@dnd-kit/core':
@@ -99,6 +105,9 @@ importers:
       '@forgestudio/components':
         specifier: workspace:*
         version: link:../components
+      '@forgestudio/data-binding':
+        specifier: workspace:*
+        version: link:../data-binding
       '@forgestudio/protocol':
         specifier: workspace:*
         version: link:../protocol

@@ -50,9 +50,26 @@ export function PropsPanel() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
   const schema = useEditorStore((s) => s.schema)
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps)
+  const updateNodeLoop = useEditorStore((s) => s.updateNodeLoop)
   const removeNode = useEditorStore((s) => s.removeNode)
   const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
+
+  const handlePropChange = (nodeId: string, component: string, propName: string, value: unknown) => {
+    updateNodeProps(nodeId, { [propName]: value })
+
+    // Special handling for List component's dataSourceId
+    if (component === 'List' && propName === 'dataSourceId') {
+      if (value) {
+        updateNodeLoop(nodeId, {
+          dataSourceId: String(value),
+          itemName: 'item',
+        })
+      } else {
+        updateNodeLoop(nodeId, undefined)
+      }
+    }
+  }
 
   if (!selectedNodeId) {
     return (
@@ -63,6 +80,12 @@ export function PropsPanel() {
             onClick={() => setRightPanelTab('props')}
           >
             属性
+          </button>
+          <button
+            className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
+            onClick={() => setRightPanelTab('datasource')}
+          >
+            数据源
           </button>
           <button
             className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
@@ -92,6 +115,12 @@ export function PropsPanel() {
           属性
         </button>
         <button
+          className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('datasource')}
+        >
+          数据源
+        </button>
+        <button
           className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
           onClick={() => setRightPanelTab('code')}
         >
@@ -107,7 +136,7 @@ export function PropsPanel() {
           key={def.name}
           def={def}
           value={node.props[def.name] ?? def.default}
-          onChange={(v) => updateNodeProps(node.id, { [def.name]: v })}
+          onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
         />
       ))}
       {node.component !== 'Page' && (

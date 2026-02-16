@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FSPSchema, ComponentNode } from '@forgestudio/protocol'
+import type { FSPSchema, ComponentNode, DataSourceDef } from '@forgestudio/protocol'
 import type { GeneratedProject } from '@forgestudio/codegen-core'
 import {
   createEmptySchema,
@@ -16,7 +16,7 @@ export interface EditorState {
   schema: FSPSchema
   selectedNodeId: string | null
   generatedProject: GeneratedProject | null
-  rightPanelTab: 'props' | 'code'
+  rightPanelTab: 'props' | 'datasource' | 'code'
 
   // Actions
   selectNode: (id: string | null) => void
@@ -25,10 +25,14 @@ export interface EditorState {
   moveNode: (nodeId: string, targetParentId: string, index: number) => void
   updateNodeProps: (nodeId: string, props: Record<string, unknown>) => void
   updateNodeStyles: (nodeId: string, styles: Record<string, unknown>) => void
+  updateNodeLoop: (nodeId: string, loop: ComponentNode['loop']) => void
   exportSchema: () => FSPSchema
   importSchema: (schema: FSPSchema) => void
-  setRightPanelTab: (tab: 'props' | 'code') => void
+  setRightPanelTab: (tab: 'props' | 'datasource' | 'code') => void
   generateCode: () => void
+  addDataSource: (ds: Omit<DataSourceDef, 'id'>) => void
+  updateDataSource: (id: string, updates: Partial<DataSourceDef>) => void
+  removeDataSource: (id: string) => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -103,6 +107,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const node = findNodeById(schema.componentTree, nodeId)
       if (!node) return state
       Object.assign(node.styles, styles)
+      return { schema }
+    })
+  },
+
+  updateNodeLoop: (nodeId, loop) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const node = findNodeById(schema.componentTree, nodeId)
+      if (!node) return state
+      node.loop = loop
+      return { schema }
+    })
+  },
+
+  addDataSource: (ds) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      if (!schema.dataSources) schema.dataSources = []
+      const id = `ds_${Date.now()}`
+      schema.dataSources.push({ ...ds, id } as DataSourceDef)
+      return { schema }
+    })
+  },
+
+  updateDataSource: (id, updates) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const ds = schema.dataSources?.find((d) => d.id === id)
+      if (!ds) return state
+      Object.assign(ds, updates)
+      return { schema }
+    })
+  },
+
+  removeDataSource: (id) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      if (!schema.dataSources) return state
+      schema.dataSources = schema.dataSources.filter((d) => d.id !== id)
       return { schema }
     })
   },

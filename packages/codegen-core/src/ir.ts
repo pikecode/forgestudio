@@ -20,6 +20,10 @@ export interface IRRenderNode {
   props: Record<string, IRExpression>
   children: (IRRenderNode | IRTextContent)[]
   className?: string          // CSS class name (= node id)
+  loop?: {                    // Loop rendering info (M1.3)
+    dataVar: string           // e.g. 'productsData'
+    itemVar: string           // e.g. 'item'
+  }
 }
 
 export interface IRTextContent {
