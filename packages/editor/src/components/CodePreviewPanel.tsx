@@ -39,6 +39,12 @@ export function CodePreviewPanel() {
           >
             代码
           </button>
+          <button
+            className={`forge-editor-tab ${rightPanelTab === 'preview' ? 'forge-editor-tab--active' : ''}`}
+            onClick={() => setRightPanelTab('preview')}
+          >
+            预览
+          </button>
         </div>
         <div className="forge-editor-panel__empty">
           点击"生成 Taro 代码"按钮查看生成的代码
@@ -99,6 +105,12 @@ export function CodePreviewPanel() {
           onClick={() => setRightPanelTab('code')}
         >
           代码
+        </button>
+        <button
+          className={`forge-editor-tab ${rightPanelTab === 'preview' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('preview')}
+        >
+          预览
         </button>
       </div>
 

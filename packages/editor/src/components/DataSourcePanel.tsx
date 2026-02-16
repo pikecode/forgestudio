@@ -160,6 +160,12 @@ export function DataSourcePanel() {
         >
           代码
         </button>
+        <button
+          className={`forge-editor-tab ${rightPanelTab === 'preview' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('preview')}
+        >
+          预览
+        </button>
       </div>
       <div className="forge-editor-panel__title">数据源管理</div>
 

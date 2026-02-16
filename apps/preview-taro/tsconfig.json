@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "typeRoots": [
+      "node_modules/@types"
+    ]
+  },
+  "include": ["./src", "./types"],
+  "exclude": ["node_modules", "dist"]
+}

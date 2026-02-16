@@ -303,6 +303,38 @@
   height: calc(100vh - 48px - 40px);
 }
 
+/* Preview panel */
+.forge-editor-panel--preview {
+  width: 400px;
+}
+
+.forge-preview-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+  overflow: auto;
+  background: #f0f2f5;
+}
+
+.forge-preview-phone {
+  width: 375px;
+  height: 667px;
+  border: 2px solid #333;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.forge-preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .forge-editor-file-tree {
   border-bottom: 1px solid #f0f0f0;
   max-height: 200px;

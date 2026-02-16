@@ -6,6 +6,7 @@ import { Canvas } from './Canvas'
 import { PropsPanel } from './PropsPanel'
 import { CodePreviewPanel } from './CodePreviewPanel'
 import { DataSourcePanel } from './DataSourcePanel'
+import { PreviewPanel } from './PreviewPanel'
 import { Toolbar } from './Toolbar'
 
 export function EditorLayout() {
@@ -56,6 +57,7 @@ export function EditorLayout() {
           {rightPanelTab === 'props' && <PropsPanel />}
           {rightPanelTab === 'datasource' && <DataSourcePanel />}
           {rightPanelTab === 'code' && <CodePreviewPanel />}
+          {rightPanelTab === 'preview' && <PreviewPanel />}
         </div>
       </div>
       <DragOverlay>

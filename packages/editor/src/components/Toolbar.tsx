@@ -5,6 +5,7 @@ export function Toolbar() {
   const exportSchema = useEditorStore((s) => s.exportSchema)
   const importSchema = useEditorStore((s) => s.importSchema)
   const generateCode = useEditorStore((s) => s.generateCode)
+  const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleExport = () => {
@@ -54,6 +55,12 @@ export function Toolbar() {
           onClick={generateCode}
         >
           生成 Taro 代码
+        </button>
+        <button
+          className="forge-editor-btn"
+          onClick={() => setRightPanelTab('preview')}
+        >
+          预览
         </button>
       </div>
       <input
