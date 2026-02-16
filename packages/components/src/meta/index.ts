@@ -83,6 +83,7 @@ export const ButtonMeta: ComponentMeta = {
   allowChildren: false,
   defaultProps: { text: '按钮', type: 'default', size: 'default' },
   defaultStyles: {},
+  supportedEvents: ['onClick'],
   propsSchema: [
     { name: 'text', title: '按钮文字', type: 'string', default: '按钮' },
     {
@@ -117,6 +118,7 @@ export const InputMeta: ComponentMeta = {
   allowChildren: false,
   defaultProps: { placeholder: '请输入', type: 'text' },
   defaultStyles: {},
+  supportedEvents: ['onChange'],
   propsSchema: [
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     {
@@ -167,3 +169,31 @@ export const CardMeta: ComponentMeta = {
   ],
 }
 
+export const SwitchMeta: ComponentMeta = {
+  name: 'Switch',
+  title: '开关',
+  icon: 'toggle-right',
+  category: 'basic',
+  allowChildren: false,
+  defaultProps: { checked: false },
+  defaultStyles: {},
+  supportedEvents: ['onChange'],
+  propsSchema: [
+    { name: 'checked', title: '是否选中', type: 'boolean', default: false },
+  ],
+}
+
+export const TextareaMeta: ComponentMeta = {
+  name: 'Textarea',
+  title: '多行输入',
+  icon: 'align-left',
+  category: 'basic',
+  allowChildren: false,
+  defaultProps: { placeholder: '请输入', maxlength: 200 },
+  defaultStyles: {},
+  supportedEvents: ['onChange'],
+  propsSchema: [
+    { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
+    { name: 'maxlength', title: '最大长度', type: 'number', default: 200 },
+  ],
+}

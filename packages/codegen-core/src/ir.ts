@@ -24,6 +24,9 @@ export interface IRRenderNode {
     dataVar: string           // e.g. 'productsData'
     itemVar: string           // e.g. 'item'
   }
+  condition?: {               // Conditional rendering (M1.5)
+    expression: string        // e.g. 'inputValue' or 'count > 0'
+  }
 }
 
 export interface IRTextContent {
@@ -58,5 +61,6 @@ export interface IREffect {
 
 export interface IRHandler {
   name: string
+  params?: string  // e.g., 'e' for onChange handlers
   body: string
 }

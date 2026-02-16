@@ -17,6 +17,12 @@ export function mapProps(
   for (const [key, expr] of Object.entries(props)) {
     if (INTERNAL_PROPS.has(key)) continue
 
+    // Handle identifier type (for event handlers)
+    if (expr.type === 'identifier') {
+      result[key] = `{${expr.name}}`
+      continue
+    }
+
     const val = expr.value ?? expr
 
     // Image-specific mappings
@@ -49,9 +55,31 @@ export function mapProps(
       continue
     }
 
+    // Switch-specific mappings
+    if (tag === 'Switch' && key === 'checked') {
+      result['checked'] = `{${val}}`
+      continue
+    }
+
+    // Textarea-specific mappings
+    if (tag === 'Textarea' && key === 'placeholder') {
+      result['placeholder'] = `"${String(val)}"`
+      continue
+    }
+    if (tag === 'Textarea' && key === 'maxlength') {
+      result['maxlength'] = `{${val}}`
+      continue
+    }
+
     // Generic fallback
     if (typeof val === 'string') {
-      result[key] = `"${val}"`
+      // Handle {{varName}} expressions - bind to state
+      if (val.startsWith('{{') && val.endsWith('}}')) {
+        const varName = val.slice(2, -2).trim()
+        result[key] = `{${varName}}`
+      } else {
+        result[key] = `"${val}"`
+      }
     } else if (typeof val === 'number' || typeof val === 'boolean') {
       result[key] = `{${val}}`
     }

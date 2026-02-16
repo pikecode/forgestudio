@@ -8,6 +8,8 @@ import {
   InputMeta,
   ListMeta,
   CardMeta,
+  SwitchMeta,
+  TextareaMeta,
 } from './meta'
 
 const registry = new Map<string, ComponentMeta>()
@@ -25,6 +27,8 @@ register(ButtonMeta)
 register(InputMeta)
 register(ListMeta)
 register(CardMeta)
+register(SwitchMeta)
+register(TextareaMeta)
 
 export function getComponentMeta(name: string): ComponentMeta | undefined {
   return registry.get(name)

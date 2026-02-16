@@ -148,6 +148,57 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
         />
       )
 
+    case 'Switch':
+      return (
+        <div
+          style={{
+            display: 'inline-block',
+            width: 52,
+            height: 32,
+            borderRadius: 16,
+            background: evaluatedProps.checked ? '#07c160' : '#ddd',
+            position: 'relative',
+            cursor: 'pointer',
+            transition: 'background 0.3s',
+            ...style,
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 2,
+              left: evaluatedProps.checked ? 22 : 2,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: '#fff',
+              transition: 'left 0.3s',
+            }}
+          />
+        </div>
+      )
+
+    case 'Textarea':
+      return (
+        <textarea
+          placeholder={String(evaluatedProps.placeholder ?? '')}
+          maxLength={Number(evaluatedProps.maxlength ?? 200)}
+          style={{
+            padding: '6px 8px',
+            border: '1px solid #ddd',
+            borderRadius: 4,
+            fontSize: 14,
+            width: '100%',
+            minHeight: 80,
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'inherit',
+            ...style,
+          }}
+          readOnly
+        />
+      )
+
     default:
       return <div style={style}>[{node.component}]</div>
   }
@@ -155,6 +206,44 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
 
 export function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
   const schema = useEditorStore((s) => s.schema)
+
+  // Handle conditional rendering (M1.5)
+  if (node.condition) {
+    const expr = node.condition.expression
+    // Evaluate condition - support {{varName}} syntax
+    let shouldRender = false
+    if (expr.startsWith('{{') && expr.endsWith('}}')) {
+      const varName = expr.slice(2, -2).trim()
+      // Check formStates for the variable value
+      const formState = schema.formStates?.find(fs => fs.id === varName)
+      const value = formState?.defaultValue
+      // Truthy check: non-empty string, non-zero number, true boolean
+      shouldRender = !!value && value !== '' && value !== 0
+    } else {
+      // For now, treat non-template expressions as always true
+      shouldRender = true
+    }
+
+    if (!shouldRender) {
+      // Don't render - show placeholder in editor
+      return (
+        <EditWrapper node={node}>
+          <div style={{
+            ...node.styles as React.CSSProperties,
+            padding: 8,
+            background: '#f0f0f0',
+            border: '1px dashed #ccc',
+            borderRadius: 4,
+            opacity: 0.5
+          }}>
+            <div style={{ fontSize: 11, color: '#999' }}>
+              🚫 条件不满足: {node.condition.expression}
+            </div>
+          </div>
+        </EditWrapper>
+      )
+    }
+  }
 
   // Handle loop rendering
   if (node.loop) {

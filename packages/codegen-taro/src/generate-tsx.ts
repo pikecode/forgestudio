@@ -16,7 +16,19 @@ export function generateTSX(ir: IRPage): string {
 
   // Generate state declarations
   const hasState = ir.stateVars.length > 0
-  const stateImport = hasState ? `import { useState, useEffect } from 'react'\nimport Taro from '@tarojs/taro'\n` : ''
+  const hasEffects = ir.effects.length > 0
+  const hasHandlers = ir.handlers.length > 0
+  const needsReactHooks = hasState || hasEffects
+  const needsTaro = hasEffects || hasHandlers
+
+  let stateImport = ''
+  if (needsReactHooks && needsTaro) {
+    stateImport = `import { useState, useEffect } from 'react'\nimport Taro from '@tarojs/taro'\n`
+  } else if (needsReactHooks) {
+    stateImport = `import { useState, useEffect } from 'react'\n`
+  } else if (needsTaro) {
+    stateImport = `import Taro from '@tarojs/taro'\n`
+  }
 
   const stateDecls = ir.stateVars.map(v => {
     const capitalizedName = v.name.charAt(0).toUpperCase() + v.name.slice(1)
@@ -24,7 +36,14 @@ export function generateTSX(ir: IRPage): string {
       const items = v.defaultValue.map(item => '    ' + JSON.stringify(item))
       return `  const [${v.name}, set${capitalizedName}] = useState([\n${items.join(',\n')}\n  ])`
     }
-    return `  const [${v.name}, set${capitalizedName}] = useState([])`
+    if (v.type === 'any[]') {
+      return `  const [${v.name}, set${capitalizedName}] = useState([])`
+    }
+    // Form states with primitive types
+    const defaultVal = v.defaultValue !== undefined
+      ? (typeof v.defaultValue === 'string' ? `'${v.defaultValue}'` : v.defaultValue)
+      : (v.type === 'number' ? 0 : v.type === 'boolean' ? false : "''")
+    return `  const [${v.name}, set${capitalizedName}] = useState(${defaultVal})`
   }).join('\n')
 
   // Generate effects
@@ -32,10 +51,17 @@ export function generateTSX(ir: IRPage): string {
     return `  useEffect(() => {\n    ${e.body}\n  }, [])`
   }).join('\n\n')
 
+  // Generate handlers
+  const handlersCode = ir.handlers.map(h => {
+    const params = h.params || ''
+    return `  const ${h.name} = (${params}) => {\n    ${h.body}\n  }`
+  }).join('\n\n')
+
   const jsx = renderNode(ir.renderTree, 2)
 
   const bodyParts: string[] = []
   if (stateDecls) bodyParts.push(stateDecls)
+  if (handlersCode) bodyParts.push(handlersCode)
   if (effectsCode) bodyParts.push(effectsCode)
   const bodyStr = bodyParts.length > 0 ? bodyParts.join('\n\n') + '\n\n' : ''
 
@@ -78,6 +104,9 @@ function renderNode(node: IRRenderNode, indent: number): string {
   const { taroTag } = getTaroMapping(node.tag)
   const propsStr = buildPropsString(taroTag, node)
 
+  // Handle conditional rendering (M1.5)
+  let nodeJSX = ''
+
   // Handle loop rendering
   if (node.loop) {
     const { dataVar, itemVar } = node.loop
@@ -99,38 +128,47 @@ function renderNode(node: IRRenderNode, indent: number): string {
       })
       .join('\n')
 
-    return `${pad}{${dataVar}.map((${itemVar}, index) => (
+    nodeJSX = `${pad}{${dataVar}.map((${itemVar}, index) => (
 ${pad}  <${taroTag} key={index}${propsStr}>
 ${childrenStr}
 ${pad}  </${taroTag}>
 ${pad}))}`
   }
-
   // Self-closing if no children
-  if (node.children.length === 0) {
-    return `${pad}<${taroTag}${propsStr} />`
+  else if (node.children.length === 0) {
+    nodeJSX = `${pad}<${taroTag}${propsStr} />`
+  }
+  // Children
+  else {
+    const childrenStr = node.children
+      .map((child) => {
+        if ('type' in child && child.type === 'text') {
+          const text = child.value
+          // Handle expressions in text: {{$item.title}} -> {item.title}
+          if (text.includes('{{')) {
+            const jsxExpr = text.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
+              const cleaned = expr.trim().replace(/^\$/, '')
+              return `{${cleaned}}`
+            })
+            return `${pad}  ${jsxExpr}`
+          }
+          return `${pad}  ${text}`
+        }
+        return renderNode(child as IRRenderNode, indent + 2)
+      })
+      .join('\n')
+
+    nodeJSX = `${pad}<${taroTag}${propsStr}>\n${childrenStr}\n${pad}</${taroTag}>`
   }
 
-  // Children
-  const childrenStr = node.children
-    .map((child) => {
-      if ('type' in child && child.type === 'text') {
-        const text = child.value
-        // Handle expressions in text: {{$item.title}} -> {item.title}
-        if (text.includes('{{')) {
-          const jsxExpr = text.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
-            const cleaned = expr.trim().replace(/^\$/, '')
-            return `{${cleaned}}`
-          })
-          return `${pad}  ${jsxExpr}`
-        }
-        return `${pad}  ${text}`
-      }
-      return renderNode(child as IRRenderNode, indent + 2)
-    })
-    .join('\n')
+  // Wrap with condition if present
+  if (node.condition) {
+    return `${pad}{${node.condition.expression} && (
+${nodeJSX}
+${pad})}`
+  }
 
-  return `${pad}<${taroTag}${propsStr}>\n${childrenStr}\n${pad}</${taroTag}>`
+  return nodeJSX
 }
 
 function buildPropsString(taroTag: string, node: IRRenderNode): string {

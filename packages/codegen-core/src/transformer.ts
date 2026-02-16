@@ -1,4 +1,4 @@
-import type { ComponentNode, FSPSchema } from '@forgestudio/protocol'
+import type { ComponentNode, FSPSchema, Action } from '@forgestudio/protocol'
 import type {
   IRPage,
   IRRenderNode,
@@ -7,6 +7,7 @@ import type {
   IRStyleRule,
   IRStateVar,
   IREffect,
+  IRHandler,
 } from './ir'
 import { camelToKebab, formatStyleValue } from './style-utils'
 
@@ -14,6 +15,8 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
   const styleRules: IRStyleRule[] = []
   const stateVars: IRStateVar[] = []
   const effects: IREffect[] = []
+  const handlers: IRHandler[] = []
+  let handlerCounter = 0
 
   // Generate state vars and effects from data sources
   for (const ds of schema.dataSources ?? []) {
@@ -33,6 +36,39 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
         body: `Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(() => {})`,
       })
     }
+  }
+
+  // Generate state vars from form states
+  for (const fs of schema.formStates ?? []) {
+    stateVars.push({
+      name: fs.id,
+      type: fs.type === 'number' ? 'number' : fs.type === 'boolean' ? 'boolean' : 'string',
+      defaultValue: fs.defaultValue ?? (fs.type === 'number' ? 0 : fs.type === 'boolean' ? false : ''),
+    })
+  }
+
+  // Helper to generate handler body from actions
+  function generateHandlerBody(actions: Action[]): string {
+    const statements = actions.map(action => {
+      switch (action.type) {
+        case 'navigate':
+          return `Taro.navigateTo({ url: '${action.url}' })`
+        case 'showToast':
+          return `Taro.showToast({ title: '${action.title}', icon: '${action.icon || 'success'}' })`
+        case 'setState':
+          return `set${action.target.charAt(0).toUpperCase() + action.target.slice(1)}(${action.value})`
+        default:
+          return ''
+      }
+    }).filter(Boolean)
+    return statements.join('\n    ')
+  }
+
+  // Check if handler needs event parameter (e.g., onChange with e.detail.value)
+  function needsEventParam(actions: Action[]): boolean {
+    return actions.some(action =>
+      action.type === 'setState' && action.value.includes('e.detail')
+    )
   }
 
   function transformNode(node: ComponentNode): IRRenderNode | null {
@@ -73,6 +109,27 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
       irProps[key] = { type: 'literal', value: val }
     }
 
+    // Handle events - generate handlers and add to props
+    if (node.events) {
+      for (const [eventName, actions] of Object.entries(node.events)) {
+        if (actions.length > 0) {
+          handlerCounter++
+          const handlerName = `handle${eventName.charAt(0).toUpperCase() + eventName.slice(1)}${handlerCounter}`
+          const handlerBody = generateHandlerBody(actions)
+          const needsEvent = needsEventParam(actions)
+
+          handlers.push({
+            name: handlerName,
+            params: needsEvent ? 'e' : undefined,
+            body: handlerBody,
+          })
+
+          // Add handler reference to props
+          irProps[eventName] = { type: 'identifier', name: handlerName }
+        }
+      }
+    }
+
     // Determine tag — Page becomes View (root wrapper)
     const tag = node.component === 'Page' ? 'View' : node.component
 
@@ -84,12 +141,24 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
       loopInfo = { dataVar, itemVar }
     }
 
+    // Handle condition (M1.5)
+    let conditionInfo: IRRenderNode['condition'] = undefined
+    if (node.condition) {
+      // Extract variable name from {{varName}} syntax
+      let expr = node.condition.expression
+      if (expr.startsWith('{{') && expr.endsWith('}}')) {
+        expr = expr.slice(2, -2).trim()
+      }
+      conditionInfo = { expression: expr }
+    }
+
     return {
       tag,
       props: irProps,
       children,
       className: node.id,
       loop: loopInfo,
+      condition: conditionInfo,
     }
   }
 
@@ -100,7 +169,7 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
     imports: [],       // filled by the codegen plugin
     stateVars,
     effects,
-    handlers: [],
+    handlers,
     renderTree,
     styles: { rules: styleRules },
   }

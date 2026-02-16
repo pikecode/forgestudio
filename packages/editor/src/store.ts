@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FSPSchema, ComponentNode, DataSourceDef } from '@forgestudio/protocol'
+import type { FSPSchema, ComponentNode, DataSourceDef, Action, FormStateDef } from '@forgestudio/protocol'
 import type { GeneratedProject } from '@forgestudio/codegen-core'
 import {
   createEmptySchema,
@@ -16,7 +16,7 @@ export interface EditorState {
   schema: FSPSchema
   selectedNodeId: string | null
   generatedProject: GeneratedProject | null
-  rightPanelTab: 'props' | 'datasource' | 'code'
+  rightPanelTab: 'props' | 'datasource' | 'code' | 'preview'
 
   // Actions
   selectNode: (id: string | null) => void
@@ -26,13 +26,19 @@ export interface EditorState {
   updateNodeProps: (nodeId: string, props: Record<string, unknown>) => void
   updateNodeStyles: (nodeId: string, styles: Record<string, unknown>) => void
   updateNodeLoop: (nodeId: string, loop: ComponentNode['loop']) => void
+  updateNodeCondition: (nodeId: string, condition: ComponentNode['condition']) => void
   exportSchema: () => FSPSchema
   importSchema: (schema: FSPSchema) => void
-  setRightPanelTab: (tab: 'props' | 'datasource' | 'code') => void
+  setRightPanelTab: (tab: 'props' | 'datasource' | 'code' | 'preview') => void
   generateCode: () => void
   addDataSource: (ds: Omit<DataSourceDef, 'id'>) => void
   updateDataSource: (id: string, updates: Partial<DataSourceDef>) => void
   removeDataSource: (id: string) => void
+  addFormState: (id: string, fs: Omit<FormStateDef, 'id'>) => void
+  updateFormState: (id: string, updates: Partial<FormStateDef>) => void
+  removeFormState: (id: string) => void
+  updateNodeEvents: (nodeId: string, eventName: string, actions: Action[]) => void
+  removeNodeEvent: (nodeId: string, eventName: string) => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -154,6 +160,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })
   },
 
+  updateNodeCondition: (nodeId, condition) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const node = findNodeById(schema.componentTree, nodeId)
+      if (!node) return state
+      node.condition = condition
+      return { schema }
+    })
+  },
+
   addDataSource: (ds) => {
     set((state) => {
       const schema = structuredClone(state.schema)
@@ -180,6 +196,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const schema = structuredClone(state.schema)
       if (!schema.dataSources) return state
       schema.dataSources = schema.dataSources.filter((d) => d.id !== id)
+      return { schema }
+    })
+  },
+
+  addFormState: (id, fs) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      if (!schema.formStates) schema.formStates = []
+      schema.formStates.push({ ...fs, id } as FormStateDef)
+      return { schema }
+    })
+  },
+
+  updateFormState: (id, updates) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const fs = schema.formStates?.find((f) => f.id === id)
+      if (!fs) return state
+      Object.assign(fs, updates)
+      return { schema }
+    })
+  },
+
+  removeFormState: (id) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      if (!schema.formStates) return state
+      schema.formStates = schema.formStates.filter((f) => f.id !== id)
+      return { schema }
+    })
+  },
+
+  updateNodeEvents: (nodeId, eventName, actions) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const node = findNodeById(schema.componentTree, nodeId)
+      if (!node) return state
+      if (!node.events) node.events = {}
+      node.events[eventName] = actions
+      return { schema }
+    })
+  },
+
+  removeNodeEvent: (nodeId, eventName) => {
+    set((state) => {
+      const schema = structuredClone(state.schema)
+      const node = findNodeById(schema.componentTree, nodeId)
+      if (!node || !node.events) return state
+      delete node.events[eventName]
       return { schema }
     })
   },
