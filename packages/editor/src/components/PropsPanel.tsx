@@ -51,11 +51,26 @@ export function PropsPanel() {
   const schema = useEditorStore((s) => s.schema)
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps)
   const removeNode = useEditorStore((s) => s.removeNode)
+  const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
+  const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
 
   if (!selectedNodeId) {
     return (
       <div className="forge-editor-panel forge-editor-panel--right">
-        <div className="forge-editor-panel__title">属性</div>
+        <div className="forge-editor-tabs">
+          <button
+            className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
+            onClick={() => setRightPanelTab('props')}
+          >
+            属性
+          </button>
+          <button
+            className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
+            onClick={() => setRightPanelTab('code')}
+          >
+            代码
+          </button>
+        </div>
         <div className="forge-editor-panel__empty">选择一个组件以编辑属性</div>
       </div>
     )
@@ -69,6 +84,20 @@ export function PropsPanel() {
 
   return (
     <div className="forge-editor-panel forge-editor-panel--right">
+      <div className="forge-editor-tabs">
+        <button
+          className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('props')}
+        >
+          属性
+        </button>
+        <button
+          className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('code')}
+        >
+          代码
+        </button>
+      </div>
       <div className="forge-editor-panel__title">
         {meta?.title ?? node.component}
       </div>

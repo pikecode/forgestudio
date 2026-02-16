@@ -4,11 +4,13 @@ import { useEditorStore } from '../store'
 import { ComponentPanel } from './ComponentPanel'
 import { Canvas } from './Canvas'
 import { PropsPanel } from './PropsPanel'
+import { CodePreviewPanel } from './CodePreviewPanel'
 import { Toolbar } from './Toolbar'
 
 export function EditorLayout() {
   const addNode = useEditorStore((s) => s.addNode)
   const schema = useEditorStore((s) => s.schema)
+  const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
   const [draggingName, setDraggingName] = React.useState<string | null>(null)
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -41,7 +43,7 @@ export function EditorLayout() {
         <div className="forge-editor__body">
           <ComponentPanel />
           <Canvas />
-          <PropsPanel />
+          {rightPanelTab === 'props' ? <PropsPanel /> : <CodePreviewPanel />}
         </div>
       </div>
       <DragOverlay>

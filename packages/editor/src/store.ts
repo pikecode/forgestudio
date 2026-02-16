@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { FSPSchema, ComponentNode } from '@forgestudio/protocol'
+import type { GeneratedProject } from '@forgestudio/codegen-core'
 import {
   createEmptySchema,
   createNode,
@@ -9,10 +10,13 @@ import {
   moveNode as moveNodeInTree,
 } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
+import { generateTaroProject } from './codegen'
 
 export interface EditorState {
   schema: FSPSchema
   selectedNodeId: string | null
+  generatedProject: GeneratedProject | null
+  rightPanelTab: 'props' | 'code'
 
   // Actions
   selectNode: (id: string | null) => void
@@ -23,13 +27,25 @@ export interface EditorState {
   updateNodeStyles: (nodeId: string, styles: Record<string, unknown>) => void
   exportSchema: () => FSPSchema
   importSchema: (schema: FSPSchema) => void
+  setRightPanelTab: (tab: 'props' | 'code') => void
+  generateCode: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   schema: createEmptySchema(),
   selectedNodeId: null,
+  generatedProject: null,
+  rightPanelTab: 'props',
 
   selectNode: (id) => set({ selectedNodeId: id }),
+
+  setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+
+  generateCode: () => {
+    const schema = get().schema
+    const project = generateTaroProject(schema)
+    set({ generatedProject: project, rightPanelTab: 'code' })
+  },
 
   addNode: (parentId, componentName, index) => {
     set((state) => {
