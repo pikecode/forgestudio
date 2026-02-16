@@ -1,8 +1,13 @@
 export function generateAppTs(): string {
-  return `import { PropsWithChildren } from 'react'
+  return `import { useLaunch } from '@tarojs/taro'
 import './app.scss'
 
-function App({ children }: PropsWithChildren) {
+function App({ children }) {
+  useLaunch(() => {
+    console.log('App launched.')
+  })
+
+  // children 是将要会渲染的页面
   return children
 }
 

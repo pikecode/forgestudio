@@ -23,8 +23,8 @@ export function parseExpression(template: string): ParsedPart[] {
     const expr = match[1].trim()
     const path = expr.split('.').map((p) => p.trim())
 
-    // Validate: only allow 2-part paths for M1
-    if (path.length > 2) {
+    // Validate: allow up to 4-part paths (e.g. $item.detail.info.name)
+    if (path.length > 4) {
       // Invalid expression - treat as static
       parts.push({
         type: 'static',

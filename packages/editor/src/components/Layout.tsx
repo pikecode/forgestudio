@@ -29,11 +29,20 @@ export function EditorLayout() {
     const activeData = active.data.current
     const overData = over.data.current
 
-    // Dragging from palette onto canvas
-    if (activeData?.type === 'palette' && overData?.type === 'canvas') {
+    // Dragging from palette onto canvas or node
+    if (activeData?.type === 'palette') {
       const componentName = activeData.componentName as string
-      const parentId = overData.parentId as string
-      addNode(parentId, componentName)
+      let parentId: string | undefined
+
+      if (overData?.type === 'canvas') {
+        parentId = overData.parentId as string
+      } else if (overData?.type === 'node') {
+        parentId = overData.parentId as string
+      }
+
+      if (parentId) {
+        addNode(parentId, componentName)
+      }
     }
   }
 

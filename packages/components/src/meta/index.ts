@@ -140,7 +140,7 @@ export const ListMeta: ComponentMeta = {
   icon: 'list',
   category: 'data',
   allowChildren: true,
-  defaultProps: {},
+  defaultProps: { dataSourceId: '' },
   defaultStyles: { display: 'flex', flexDirection: 'column', gap: 8 },
   propsSchema: [
     { name: 'dataSourceId', title: '数据源', type: 'string', default: '' },
@@ -153,13 +153,17 @@ export const CardMeta: ComponentMeta = {
   icon: 'credit-card',
   category: 'data',
   allowChildren: true,
-  defaultProps: {},
+  defaultProps: { title: '' },
   defaultStyles: {
     padding: 12,
     backgroundColor: '#ffffff',
     borderRadius: 8,
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
-  propsSchema: [],
+  propsSchema: [
+    { name: 'title', title: '标题', type: 'string', default: '' },
+    { name: 'backgroundColor', title: '背景色', type: 'color', default: '#ffffff' },
+    { name: 'borderRadius', title: '圆角', type: 'number', default: 8 },
+  ],
 }
 

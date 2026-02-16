@@ -58,6 +58,7 @@ export function EnumSetter({
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
       >
+        <option value="">-- 请选择 --</option>
         {(options ?? []).map((opt) => (
           <option key={String(opt.value)} value={String(opt.value)}>
             {opt.label}

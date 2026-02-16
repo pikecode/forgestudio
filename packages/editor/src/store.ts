@@ -65,6 +65,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         meta ? { ...meta.defaultStyles } : {},
       )
 
+      // Add default children for List and Card
+      if (componentName === 'List') {
+        // List gets a Card with Text children showing expression binding
+        const cardMeta = getComponentMeta('Card')
+        const textMeta = getComponentMeta('Text')
+        const card = createNode(
+          'Card',
+          cardMeta ? { ...cardMeta.defaultProps } : {},
+          cardMeta ? { ...cardMeta.defaultStyles } : {},
+        )
+        const titleText = createNode(
+          'Text',
+          { content: '{{$item.title}}', ...(textMeta?.defaultProps || {}) },
+          { fontSize: 16, fontWeight: 'bold', marginBottom: 4, ...(textMeta?.defaultStyles || {}) },
+        )
+        const descText = createNode(
+          'Text',
+          { content: '{{$item.description}}', ...(textMeta?.defaultProps || {}) },
+          { fontSize: 14, color: '#666', ...(textMeta?.defaultStyles || {}) },
+        )
+        card.children = [titleText, descText]
+        node.children = [card]
+      } else if (componentName === 'Card') {
+        // Card gets a Text child
+        const textMeta = getComponentMeta('Text')
+        const text = createNode(
+          'Text',
+          { content: '卡片内容', ...(textMeta?.defaultProps || {}) },
+          textMeta ? { ...textMeta.defaultStyles } : {},
+        )
+        node.children = [text]
+      }
+
       const i = index ?? parent.children.length
       parent.children.splice(i, 0, node)
       return { schema, selectedNodeId: node.id }
@@ -125,7 +158,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const schema = structuredClone(state.schema)
       if (!schema.dataSources) schema.dataSources = []
-      const id = `ds_${Date.now()}`
+      const count = schema.dataSources.length + 1
+      const id = `ds${count}`
       schema.dataSources.push({ ...ds, id } as DataSourceDef)
       return { schema }
     })

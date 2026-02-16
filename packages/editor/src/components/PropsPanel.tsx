@@ -1,7 +1,7 @@
 import React from 'react'
 import type { PropDefinition } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
-import { findNodeById } from '@forgestudio/protocol'
+import { findNodeById, findParentNode } from '@forgestudio/protocol'
 import { useEditorStore } from '../store'
 import {
   StringSetter,
@@ -10,6 +10,26 @@ import {
   EnumSetter,
   ColorSetter,
 } from '../setters'
+
+/** Find the ancestor List node that has a loop binding */
+function findLoopAncestor(tree: import('@forgestudio/protocol').ComponentNode, nodeId: string): import('@forgestudio/protocol').ComponentNode | null {
+  let current = findParentNode(tree, nodeId)
+  while (current) {
+    if (current.loop) return current
+    current = findParentNode(tree, current.id)
+  }
+  return null
+}
+
+/** Extract field names from mock data */
+function getDataSourceFields(schema: import('@forgestudio/protocol').FSPSchema, dataSourceId: string): string[] {
+  const ds = schema.dataSources?.find((d) => d.id === dataSourceId)
+  if (!ds?.mockData) return []
+  const mockDataObj = ds.mockData as { data?: any[] }
+  const firstItem = mockDataObj?.data?.[0]
+  if (!firstItem || typeof firstItem !== 'object') return []
+  return Object.keys(firstItem)
+}
 
 function SetterFor({
   def,
@@ -104,6 +124,7 @@ export function PropsPanel() {
 
   const meta = getComponentMeta(node.component)
   const propsSchema = meta?.propsSchema ?? []
+  const loopAncestor = findLoopAncestor(schema.componentTree, node.id)
 
   return (
     <div className="forge-editor-panel forge-editor-panel--right">
@@ -131,14 +152,62 @@ export function PropsPanel() {
         {meta?.title ?? node.component}
       </div>
       <div className="forge-editor-panel__section">属性</div>
-      {propsSchema.map((def) => (
-        <SetterFor
-          key={def.name}
-          def={def}
-          value={node.props[def.name] ?? def.default}
-          onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
-        />
-      ))}
+      {propsSchema.map((def) => {
+        // For List's dataSourceId, dynamically build enum options from available data sources
+        if (node.component === 'List' && def.name === 'dataSourceId') {
+          const dsOptions = (schema.dataSources ?? []).map((ds) => ({
+            label: ds.id,
+            value: ds.id,
+          }))
+          if (dsOptions.length === 0) {
+            return (
+              <div key={def.name} style={{ padding: '8px 12px', color: '#999', fontSize: 12 }}>
+                请先在"数据源"标签页添加数据源
+              </div>
+            )
+          }
+          return (
+            <EnumSetter
+              key={def.name}
+              label={def.title}
+              value={node.props[def.name] ?? ''}
+              onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
+              options={dsOptions}
+            />
+          )
+        }
+
+        // For string props inside a loop, show field picker
+        if (def.type === 'string' && loopAncestor) {
+          const fields = getDataSourceFields(schema, loopAncestor.loop!.dataSourceId)
+          if (fields.length > 0) {
+            const fieldOptions = fields.map((f) => ({
+              label: `$item.${f}`,
+              value: `{{$item.${f}}}`,
+            }))
+            const currentValue = node.props[def.name] ?? def.default
+            return (
+              <div key={def.name}>
+                <EnumSetter
+                  label={`${def.title}（绑定字段）`}
+                  value={currentValue}
+                  onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
+                  options={fieldOptions}
+                />
+              </div>
+            )
+          }
+        }
+
+        return (
+          <SetterFor
+            key={def.name}
+            def={def}
+            value={node.props[def.name] ?? def.default}
+            onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
+          />
+        )
+      })}
       {node.component !== 'Page' && (
         <div style={{ marginTop: 16, padding: '0 12px' }}>
           <button

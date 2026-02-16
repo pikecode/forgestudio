@@ -18,17 +18,19 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
   // Generate state vars and effects from data sources
   for (const ds of schema.dataSources ?? []) {
     const varName = `${ds.id}Data`
+    const raw = ds.mockData as any
+    const mockData = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
     stateVars.push({
       name: varName,
       type: 'any[]',
-      defaultValue: [],
+      defaultValue: mockData,
     })
 
     if (ds.autoFetch) {
       const capitalizedName = varName.charAt(0).toUpperCase() + varName.slice(1)
       effects.push({
         trigger: 'mount',
-        body: `Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' }).then(res => set${capitalizedName}(res.data.data || []))`,
+        body: `Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(() => {})`,
       })
     }
   }
@@ -49,15 +51,9 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
     // Build children
     const children: (IRRenderNode | IRTextContent)[] = []
 
-    // Text content from props (handle expressions)
+    // Text content from props (expressions are preserved as-is for codegen)
     if (node.component === 'Text' && node.props.content) {
-      const content = String(node.props.content)
-      if (content.includes('{{')) {
-        // Expression binding - will be handled by Taro generator
-        children.push({ type: 'text', value: content })
-      } else {
-        children.push({ type: 'text', value: content })
-      }
+      children.push({ type: 'text', value: String(node.props.content) })
     }
     if (node.component === 'Button' && node.props.text) {
       children.push({ type: 'text', value: String(node.props.text) })

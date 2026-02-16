@@ -5,6 +5,9 @@ const FIT_TO_MODE: Record<string, string> = {
   width: 'widthFix',
 }
 
+// Internal props that should not be rendered to JSX
+const INTERNAL_PROPS = new Set(['dataSourceId', 'content', 'text'])
+
 export function mapProps(
   tag: string,
   props: Record<string, any>,
@@ -12,6 +15,8 @@ export function mapProps(
   const result: Record<string, string> = {}
 
   for (const [key, expr] of Object.entries(props)) {
+    if (INTERNAL_PROPS.has(key)) continue
+
     const val = expr.value ?? expr
 
     // Image-specific mappings

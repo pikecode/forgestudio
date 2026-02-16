@@ -25,17 +25,23 @@ export function CodePreviewPanel() {
             className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
             onClick={() => setRightPanelTab('props')}
           >
-            Properties
+            属性
+          </button>
+          <button
+            className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
+            onClick={() => setRightPanelTab('datasource')}
+          >
+            数据源
           </button>
           <button
             className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
             onClick={() => setRightPanelTab('code')}
           >
-            Code
+            代码
           </button>
         </div>
         <div className="forge-editor-panel__empty">
-          Click Generate Taro Code button to view generated code
+          点击"生成 Taro 代码"按钮查看生成的代码
         </div>
       </div>
     )
@@ -80,13 +86,19 @@ export function CodePreviewPanel() {
           className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
           onClick={() => setRightPanelTab('props')}
         >
-          Properties
+          属性
+        </button>
+        <button
+          className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
+          onClick={() => setRightPanelTab('datasource')}
+        >
+          数据源
         </button>
         <button
           className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
           onClick={() => setRightPanelTab('code')}
         >
-          Code
+          代码
         </button>
       </div>
 
