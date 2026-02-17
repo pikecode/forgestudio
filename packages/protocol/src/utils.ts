@@ -1,4 +1,4 @@
-import type { ComponentNode, FSPSchema } from './types'
+import type { ComponentNode, FSPSchema, PageDef } from './types'
 
 // ---- ID generation ----
 
@@ -83,15 +83,67 @@ export function moveNode(
 // ---- Schema helpers ----
 
 export function createEmptySchema(): FSPSchema {
-  return {
-    version: '1.0.0',
-    meta: { name: '未命名页面' },
+  const defaultPage: PageDef = {
+    id: 'page_index',
+    name: 'index',
+    title: '首页',
+    path: '/pages/index/index',
     componentTree: {
-      id: 'root',
+      id: 'root_page_index',
       component: 'Page',
       props: { title: '页面' },
       styles: {},
       children: [],
     },
   }
+
+  return {
+    version: '1.0.0',
+    meta: { name: '未命名应用' },
+    componentTree: defaultPage.componentTree, // For backward compatibility
+    pages: [defaultPage],
+  }
+}
+
+// ---- Multi-page helpers (M3) ----
+
+export function createEmptyPage(name: string, title: string): PageDef {
+  const pageId = `page_${name}_${Date.now()}`
+  return {
+    id: pageId,
+    name,
+    title,
+    path: `/pages/${name}/index`,
+    componentTree: {
+      id: `root_${pageId}`,
+      component: 'Page',
+      props: { title },
+      styles: {},
+      children: [],
+    },
+  }
+}
+
+export function findPageById(schema: FSPSchema, pageId: string): PageDef | null {
+  return schema.pages?.find(p => p.id === pageId) ?? null
+}
+
+export function addPage(schema: FSPSchema, page: PageDef): void {
+  if (!schema.pages) schema.pages = []
+  schema.pages.push(page)
+}
+
+export function removePage(schema: FSPSchema, pageId: string): boolean {
+  if (!schema.pages) return false
+  const idx = schema.pages.findIndex(p => p.id === pageId)
+  if (idx === -1) return false
+  schema.pages.splice(idx, 1)
+  return true
+}
+
+export function updatePage(schema: FSPSchema, pageId: string, updates: Partial<PageDef>): boolean {
+  const page = findPageById(schema, pageId)
+  if (!page) return false
+  Object.assign(page, updates)
+  return true
 }

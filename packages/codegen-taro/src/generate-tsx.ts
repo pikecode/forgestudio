@@ -6,6 +6,15 @@ import type {
 import { getTaroMapping } from './component-map'
 import { mapProps } from './prop-map'
 
+/** Convert FSP expression variables to JSX expression variables */
+function convertExprVars(expr: string): string {
+  return expr.trim()
+    .replace(/\$state\.(\w+)/g, '$1')
+    .replace(/\$item\.(\w+)/g, 'item.$1')
+    .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+    .replace(/^\$/, '')  // fallback: strip leading $ for simple $item references
+}
+
 export function generateTSX(ir: IRPage): string {
   // Collect all unique Taro component imports
   const usedComponents = new Set<string>()
@@ -34,27 +43,33 @@ export function generateTSX(ir: IRPage): string {
     const capitalizedName = v.name.charAt(0).toUpperCase() + v.name.slice(1)
     if (Array.isArray(v.defaultValue) && v.defaultValue.length > 0) {
       const items = v.defaultValue.map(item => '    ' + JSON.stringify(item))
-      return `  const [${v.name}, set${capitalizedName}] = useState([\n${items.join(',\n')}\n  ])`
+      return `  const [${v.name}, set${capitalizedName}] = useState<any[]>([\n${items.join(',\n')}\n  ])`
     }
     if (v.type === 'any[]') {
-      return `  const [${v.name}, set${capitalizedName}] = useState([])`
+      return `  const [${v.name}, set${capitalizedName}] = useState<any[]>([])`
     }
     // Form states with primitive types
     const defaultVal = v.defaultValue !== undefined
       ? (typeof v.defaultValue === 'string' ? `'${v.defaultValue}'` : v.defaultValue)
       : (v.type === 'number' ? 0 : v.type === 'boolean' ? false : "''")
-    return `  const [${v.name}, set${capitalizedName}] = useState(${defaultVal})`
+    const typeAnnotation = v.type === 'string' ? '<string>' : v.type === 'number' ? '<number>' : v.type === 'boolean' ? '<boolean>' : ''
+    return `  const [${v.name}, set${capitalizedName}] = useState${typeAnnotation}(${defaultVal})`
   }).join('\n')
 
   // Generate effects
   const effectsCode = ir.effects.map(e => {
+    // Add error handling for fetch effects
+    if (e.body.includes('Taro.request')) {
+      return `  useEffect(() => {\n    ${e.body}\n  }, [])`
+    }
     return `  useEffect(() => {\n    ${e.body}\n  }, [])`
   }).join('\n\n')
 
   // Generate handlers
   const handlersCode = ir.handlers.map(h => {
     const params = h.params || ''
-    return `  const ${h.name} = (${params}) => {\n    ${h.body}\n  }`
+    const paramType = h.params ? ': any' : ''
+    return `  const ${h.name} = (${params}${paramType}) => {\n    ${h.body}\n  }`
   }).join('\n\n')
 
   const jsx = renderNode(ir.renderTree, 2)
@@ -65,10 +80,13 @@ export function generateTSX(ir: IRPage): string {
   if (effectsCode) bodyParts.push(effectsCode)
   const bodyStr = bodyParts.length > 0 ? bodyParts.join('\n\n') + '\n\n' : ''
 
-  // Generate extractList helper if there are data sources
-  const extractListFn = hasState ? `
-// 自动从接口响应中提取数组数据
-// 支持: 直接数组、{ data: [] }、{ list: [] }、{ results: [] } 等格式
+  // Generate extractList helper if there are data sources with autoFetch
+  const needsExtractList = ir.effects.some(e => e.body.includes('extractList'))
+  const extractListFn = needsExtractList ? `
+/**
+ * Auto-extract array data from API response
+ * Supports: direct array, { data: [] }, { list: [] }, { results: [] }, etc.
+ */
 function extractList(data: any): any[] {
   if (Array.isArray(data)) return data
   if (data && typeof data === 'object') {
@@ -114,11 +132,10 @@ function renderNode(node: IRRenderNode, indent: number): string {
       .map((child) => {
         if ('type' in child && child.type === 'text') {
           const text = child.value
-          // Handle expressions in text: {{$item.title}} -> {item.title}
+          // Handle expressions in text: {{$item.title}} -> {item.title}, {{$state.count}} -> {count}
           if (text.includes('{{')) {
             const jsxExpr = text.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
-              const cleaned = expr.trim().replace(/^\$/, '')
-              return `{${cleaned}}`
+              return `{${convertExprVars(expr)}}`
             })
             return `${pad}    ${jsxExpr}`
           }
@@ -144,11 +161,10 @@ ${pad}))}`
       .map((child) => {
         if ('type' in child && child.type === 'text') {
           const text = child.value
-          // Handle expressions in text: {{$item.title}} -> {item.title}
+          // Handle expressions in text: {{$item.title}} -> {item.title}, {{$state.count}} -> {count}
           if (text.includes('{{')) {
             const jsxExpr = text.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
-              const cleaned = expr.trim().replace(/^\$/, '')
-              return `{${cleaned}}`
+              return `{${convertExprVars(expr)}}`
             })
             return `${pad}  ${jsxExpr}`
           }
@@ -163,12 +179,7 @@ ${pad}))}`
 
   // Wrap with condition if present (supports complex expressions)
   if (node.condition) {
-    // Convert FSP expression to JSX expression
-    // Replace $state.var -> var, $item.field -> item.field, $ds.name.data -> nameData
-    const jsxCondition = node.condition.expression
-      .replace(/\$state\.(\w+)/g, '$1')
-      .replace(/\$item\.(\w+)/g, 'item.$1')
-      .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+    const jsxCondition = convertExprVars(node.condition.expression)
 
     return `${pad}{${jsxCondition} && (
 ${nodeJSX}
