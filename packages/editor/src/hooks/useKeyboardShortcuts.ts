@@ -3,15 +3,6 @@ import { useEditorStore } from '../store'
 import { findNodeById } from '@forgestudio/protocol'
 
 export function useKeyboardShortcuts() {
-  const undo = useEditorStore((s) => s.undo)
-  const redo = useEditorStore((s) => s.redo)
-  const removeNode = useEditorStore((s) => s.removeNode)
-  const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
-  const exportSchema = useEditorStore((s) => s.exportSchema)
-  const copyNode = useEditorStore((s) => s.copyNode)
-  const pasteNode = useEditorStore((s) => s.pasteNode)
-  const schema = useEditorStore((s) => s.schema)
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if user is typing in an input/textarea
@@ -27,41 +18,43 @@ export function useKeyboardShortcuts() {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const ctrlKey = isMac ? e.metaKey : e.ctrlKey
 
+      // Read latest state inside handler to avoid stale closures
+      const state = useEditorStore.getState()
+
       // Ctrl+Z - Undo
       if (ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
-        undo()
+        state.undo()
         return
       }
 
       // Ctrl+Shift+Z or Ctrl+Y - Redo
       if ((ctrlKey && e.key === 'z' && e.shiftKey) || (ctrlKey && e.key === 'y')) {
         e.preventDefault()
-        redo()
+        state.redo()
         return
       }
 
       // Ctrl+C - Copy
-      if (ctrlKey && e.key === 'c' && selectedNodeId) {
+      if (ctrlKey && e.key === 'c' && state.selectedNodeId) {
         e.preventDefault()
-        copyNode(selectedNodeId)
+        state.copyNode(state.selectedNodeId)
         return
       }
 
       // Ctrl+V - Paste
-      if (ctrlKey && e.key === 'v' && selectedNodeId && useEditorStore.getState().clipboard) {
+      if (ctrlKey && e.key === 'v' && state.selectedNodeId && state.clipboard) {
         e.preventDefault()
-        pasteNode()
+        state.pasteNode()
         return
       }
 
       // Delete - Remove selected node
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId) {
-        // Don't delete Page root node
-        const node = findNodeById(schema.componentTree, selectedNodeId)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedNodeId) {
+        const node = findNodeById(state.schema.componentTree, state.selectedNodeId)
         if (node && node.component !== 'Page') {
           e.preventDefault()
-          removeNode(selectedNodeId)
+          state.removeNode(state.selectedNodeId)
         }
         return
       }
@@ -69,7 +62,7 @@ export function useKeyboardShortcuts() {
       // Ctrl+S - Export (save)
       if (ctrlKey && e.key === 's') {
         e.preventDefault()
-        const schema = exportSchema()
+        const schema = state.exportSchema()
         const json = JSON.stringify(schema, null, 2)
         const blob = new Blob([json], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
@@ -84,5 +77,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, removeNode, selectedNodeId, exportSchema, copyNode, pasteNode, schema])
+  }, []) // Stable: all state read via getState() inside handler
 }

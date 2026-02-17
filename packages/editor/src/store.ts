@@ -17,6 +17,11 @@ import {
 import { getComponentMeta } from '@forgestudio/components'
 import { generateTaroProject } from './codegen'
 
+export interface HistoryEntry {
+  schema: FSPSchema
+  currentPageId: string | null
+}
+
 export interface EditorState {
   schema: FSPSchema
   selectedNodeId: string | null
@@ -27,7 +32,7 @@ export interface EditorState {
   currentPageId: string | null
 
   // History management (M3)
-  history: FSPSchema[]
+  history: HistoryEntry[]
   historyIndex: number
 
   // Clipboard (M3)
@@ -99,7 +104,10 @@ function cloneNodeWithNewIds(node: ComponentNode): ComponentNode {
 // Helper function to save current state to history
 function saveToHistory(state: EditorState): Partial<EditorState> {
   const newHistory = state.history.slice(0, state.historyIndex + 1)
-  newHistory.push(structuredClone(state.schema))
+  newHistory.push({
+    schema: structuredClone(state.schema),
+    currentPageId: state.currentPageId,
+  })
 
   // Limit history size
   if (newHistory.length > MAX_HISTORY_SIZE) {
@@ -132,7 +140,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     generatedProject: null,
     rightPanelTab: 'props',
     currentPageId: initialPageId,
-    history: [structuredClone(initialSchema)],
+    history: [{ schema: structuredClone(initialSchema), currentPageId: initialPageId }],
     historyIndex: 0,
     clipboard: null,
 
@@ -353,15 +361,26 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     exportSchema: () => get().schema,
 
-    importSchema: (schema) => set({ schema, selectedNodeId: null, history: [structuredClone(schema)], historyIndex: 0 }),
+    importSchema: (schema) => {
+      const pageId = schema.pages?.[0]?.id ?? null
+      set({
+        schema,
+        selectedNodeId: null,
+        currentPageId: pageId,
+        history: [{ schema: structuredClone(schema), currentPageId: pageId }],
+        historyIndex: 0,
+      })
+    },
 
     // History actions (M3)
     undo: () => {
       set((state) => {
         if (state.historyIndex <= 0) return state
         const newIndex = state.historyIndex - 1
+        const entry = state.history[newIndex]
         return {
-          schema: structuredClone(state.history[newIndex]),
+          schema: structuredClone(entry.schema),
+          currentPageId: entry.currentPageId,
           historyIndex: newIndex,
           selectedNodeId: null,
         }
@@ -372,8 +391,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set((state) => {
         if (state.historyIndex >= state.history.length - 1) return state
         const newIndex = state.historyIndex + 1
+        const entry = state.history[newIndex]
         return {
-          schema: structuredClone(state.history[newIndex]),
+          schema: structuredClone(entry.schema),
+          currentPageId: entry.currentPageId,
           historyIndex: newIndex,
           selectedNodeId: null,
         }
@@ -488,7 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
           schema,
           currentPageId: newPage.id,
           selectedNodeId: null,
-          ...saveToHistory({ ...state, schema })
+          ...saveToHistory({ ...state, schema, currentPageId: newPage.id })
         }
       })
     },
@@ -518,7 +539,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
           schema,
           currentPageId: newCurrentPageId,
           selectedNodeId: null,
-          ...saveToHistory({ ...state, schema })
+          ...saveToHistory({ ...state, schema, currentPageId: newCurrentPageId })
         }
       })
     },

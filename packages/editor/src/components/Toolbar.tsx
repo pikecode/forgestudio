@@ -1,6 +1,5 @@
 import React, { useRef } from 'react'
 import { useEditorStore } from '../store'
-import { findNodeById } from '@forgestudio/protocol'
 
 export function Toolbar() {
   const exportSchema = useEditorStore((s) => s.exportSchema)
