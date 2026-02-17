@@ -71,12 +71,54 @@ export function mapProps(
       continue
     }
 
+    // ScrollView-specific mappings
+    if (tag === 'ScrollView' && (key === 'scrollY' || key === 'scrollX')) {
+      result[key] = `{${val}}`
+      continue
+    }
+    if (tag === 'ScrollView' && key === 'height') {
+      // Height is handled via style, skip here
+      continue
+    }
+
+    // Swiper-specific mappings
+    if (tag === 'Swiper' && key === 'autoplay') {
+      result['autoplay'] = `{${val}}`
+      continue
+    }
+    if (tag === 'Swiper' && key === 'interval') {
+      result['interval'] = `{${val}}`
+      continue
+    }
+    if (tag === 'Swiper' && key === 'circular') {
+      result['circular'] = `{${val}}`
+      continue
+    }
+    if (tag === 'Swiper' && key === 'height') {
+      // Height is handled via style, skip here
+      continue
+    }
+
+    // Modal-specific mappings
+    if (tag === 'Modal' && key === 'visible') {
+      result['visible'] = `{${val}}`
+      continue
+    }
+    if (tag === 'Modal' && key === 'title') {
+      result['title'] = `"${String(val)}"`
+      continue
+    }
+
     // Generic fallback
     if (typeof val === 'string') {
-      // Handle {{varName}} expressions - bind to state
+      // Handle {{expression}} - convert FSP variables to JSX
       if (val.startsWith('{{') && val.endsWith('}}')) {
-        const varName = val.slice(2, -2).trim()
-        result[key] = `{${varName}}`
+        const expr = val.slice(2, -2).trim()
+          .replace(/\$state\.(\w+)/g, '$1')
+          .replace(/\$item\.(\w+)/g, 'item.$1')
+          .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+          .replace(/^\$/, '')
+        result[key] = `{${expr}}`
       } else {
         result[key] = `"${val}"`
       }

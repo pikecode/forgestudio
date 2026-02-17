@@ -100,7 +100,7 @@ export function createEmptySchema(): FSPSchema {
   return {
     version: '1.0.0',
     meta: { name: '未命名应用' },
-    componentTree: defaultPage.componentTree, // For backward compatibility
+    componentTree: structuredClone(defaultPage.componentTree), // Independent copy for backward compatibility
     pages: [defaultPage],
   }
 }

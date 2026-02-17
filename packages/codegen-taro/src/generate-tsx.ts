@@ -58,10 +58,6 @@ export function generateTSX(ir: IRPage): string {
 
   // Generate effects
   const effectsCode = ir.effects.map(e => {
-    // Add error handling for fetch effects
-    if (e.body.includes('Taro.request')) {
-      return `  useEffect(() => {\n    ${e.body}\n  }, [])`
-    }
     return `  useEffect(() => {\n    ${e.body}\n  }, [])`
   }).join('\n\n')
 
