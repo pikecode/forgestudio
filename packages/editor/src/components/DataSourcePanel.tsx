@@ -81,8 +81,8 @@ export function DataSourcePanel() {
   const handleEdit = (ds: DataSourceDef) => {
     setEditingId(ds.id)
     setFormData({
-      url: ds.options.url,
-      method: ds.options.method,
+      url: ds.options?.url || '',
+      method: ds.options?.method || 'GET',
       autoFetch: ds.autoFetch,
       dependsOn: ds.dependsOn || [],
       mockData: JSON.stringify(ds.mockData, null, 2),
@@ -190,7 +190,7 @@ export function DataSourcePanel() {
         >
           <div style={{ fontWeight: 500, marginBottom: 4 }}>{ds.id}</div>
           <div style={{ color: '#666', fontSize: 12 }}>
-            {ds.options.method} {ds.options.url}
+            {ds.options?.method || 'GET'} {ds.options?.url || '(未设置)'}
           </div>
           <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
             <button

@@ -9,8 +9,18 @@ export function Canvas() {
 
   const { setNodeRef, isOver } = useDroppable({
     id: 'canvas-root',
-    data: { type: 'canvas', parentId: schema.componentTree.id },
+    data: { type: 'canvas', parentId: schema.componentTree?.id },
   })
+
+  if (!schema.componentTree) {
+    return (
+      <div className="forge-editor-canvas">
+        <div className="forge-editor-panel__empty">
+          加载中...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

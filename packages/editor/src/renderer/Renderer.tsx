@@ -199,6 +199,98 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
         />
       )
 
+    case 'ScrollView':
+      return (
+        <div
+          style={{
+            ...style,
+            overflow: evaluatedProps.scrollY ? 'auto' : evaluatedProps.scrollX ? 'auto' : 'hidden',
+            overflowX: evaluatedProps.scrollX ? 'auto' : 'hidden',
+            overflowY: evaluatedProps.scrollY ? 'auto' : 'hidden',
+          }}
+        >
+          {(node.children ?? []).map((child) => (
+            <NodeRenderer key={child.id} node={child} context={context} />
+          ))}
+        </div>
+      )
+
+    case 'Form':
+      return (
+        <div style={{ ...style, border: '1px dashed #ccc', padding: 12 }}>
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>表单容器</div>
+          {(node.children ?? []).map((child) => (
+            <NodeRenderer key={child.id} node={child} context={context} />
+          ))}
+        </div>
+      )
+
+    case 'Swiper':
+      return (
+        <div
+          style={{
+            ...style,
+            position: 'relative',
+            overflow: 'hidden',
+            background: '#f5f5f5',
+          }}
+        >
+          <div style={{ fontSize: 12, color: '#999', padding: 8 }}>
+            轮播容器 (预览模式显示第一项)
+          </div>
+          {node.children && node.children.length > 0 && (
+            <NodeRenderer key={node.children[0].id} node={node.children[0]} context={context} />
+          )}
+        </div>
+      )
+
+    case 'SwiperItem':
+      return (
+        <div style={{ ...style, width: '100%', height: '100%' }}>
+          {(node.children ?? []).map((child) => (
+            <NodeRenderer key={child.id} node={child} context={context} />
+          ))}
+        </div>
+      )
+
+    case 'Modal':
+      return evaluatedProps.visible ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 8,
+              padding: 16,
+              minWidth: 300,
+              maxWidth: '80%',
+              ...style,
+            }}
+          >
+            {evaluatedProps.title ? (
+              <div style={{ fontWeight: 'bold', marginBottom: 12, fontSize: 16 }}>
+                {String(evaluatedProps.title)}
+              </div>
+            ) : null}
+            {(node.children ?? []).map((child) => (
+              <NodeRenderer key={child.id} node={child} context={context} />
+            ))}
+          </div>
+        </div>
+      ) : null
+
     default:
       return <div style={style}>[{node.component}]</div>
   }

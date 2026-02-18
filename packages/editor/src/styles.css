@@ -22,6 +22,15 @@
   overflow: hidden;
 }
 
+.forge-editor__left-panels {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+}
+
 /* Toolbar */
 .forge-editor-toolbar {
   display: flex;
@@ -59,6 +68,16 @@
   background: #f5f5f5;
 }
 
+.forge-editor-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #f9f9f9;
+}
+
+.forge-editor-btn:disabled:hover {
+  background: #f9f9f9;
+}
+
 .forge-editor-btn--danger {
   color: #dc2626;
   border-color: #fca5a5;
@@ -71,17 +90,20 @@
 
 /* Panels (left / right) */
 .forge-editor-panel {
-  width: 260px;
   background: #fff;
   overflow-y: auto;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .forge-editor-panel--left {
-  border-right: 1px solid #e0e0e0;
+  flex: 1;
+  min-height: 0;
 }
 
 .forge-editor-panel--right {
+  width: 260px;
   border-left: 1px solid #e0e0e0;
 }
 
@@ -393,5 +415,170 @@
 
 .forge-editor-code-block code {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+/* Page Manager */
+.page-manager {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #e0e0e0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.page-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.page-manager-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.btn-add-page {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-add-page:hover {
+  background: #4338ca;
+}
+
+.btn-add-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.page-item:hover {
+  background: #f9f9f9;
+}
+
+.page-item.active {
+  background: #eef2ff;
+  border-left: 3px solid #4f46e5;
+}
+
+.page-info {
+  flex: 1;
+}
+
+.page-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.page-name {
+  font-size: 11px;
+  color: #999;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.page-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-edit,
+.btn-delete,
+.btn-save,
+.btn-cancel {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-edit:hover {
+  background: #f5f5f5;
+  border-color: #4f46e5;
+  color: #4f46e5;
+}
+
+.btn-delete {
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.btn-delete:hover {
+  background: #fef2f2;
+}
+
+.btn-save {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+
+.btn-save:hover {
+  background: #059669;
+}
+
+.btn-cancel {
+  color: #666;
+}
+
+.btn-cancel:hover {
+  background: #f5f5f5;
+}
+
+.page-edit-form,
+.page-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9f9f9;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.page-input {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  outline: none;
+}
+
+.page-input:focus {
+  border-color: #4f46e5;
+}
+
+.page-edit-actions,
+.page-add-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
 }
 

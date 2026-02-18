@@ -81,8 +81,8 @@ export function PropsPanel() {
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
-  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState'>('showToast')
-  const [actionParams, setActionParams] = useState<Record<string, string>>({})
+  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm'>('showToast')
+  const [actionParams, setActionParams] = useState<Record<string, any>>({})
 
   const handlePropChange = (nodeId: string, component: string, propName: string, value: unknown) => {
     updateNodeProps(nodeId, { [propName]: value })
@@ -515,6 +515,7 @@ export function PropsPanel() {
                       • {action.type === 'navigate' && `跳转: ${action.url}`}
                       {action.type === 'showToast' && `提示: ${action.title}`}
                       {action.type === 'setState' && `设置状态: ${action.target} = ${action.value}`}
+                      {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields.length}个字段)`}
                     </span>
                     <button
                       onClick={() => {
@@ -565,6 +566,7 @@ export function PropsPanel() {
                         <option value="showToast">显示提示</option>
                         <option value="navigate">页面跳转</option>
                         <option value="setState">设置状态</option>
+                        <option value="submitForm">提交表单</option>
                       </select>
                     </div>
 
@@ -660,6 +662,102 @@ export function PropsPanel() {
                       </>
                     )}
 
+                    {actionType === 'submitForm' && (
+                      <>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            提交地址
+                          </label>
+                          <input
+                            type="text"
+                            value={actionParams.url || ''}
+                            onChange={(e) => setActionParams({ ...actionParams, url: e.target.value })}
+                            placeholder="https://api.example.com/submit"
+                            style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                          />
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            请求方法
+                          </label>
+                          <select
+                            value={actionParams.method || 'POST'}
+                            onChange={(e) => setActionParams({ ...actionParams, method: e.target.value })}
+                            style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                          >
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                          </select>
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            提交字段（多选）
+                          </label>
+                          {schema.formStates && schema.formStates.length > 0 ? (
+                            <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid #d0d0d0', borderRadius: 4, padding: 4 }}>
+                              {schema.formStates.map((fs) => (
+                                <label
+                                  key={fs.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    fontSize: 12,
+                                    marginBottom: 4,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(actionParams.fields || []).includes(fs.id)}
+                                    onChange={(e) => {
+                                      const fields = actionParams.fields || []
+                                      if (e.target.checked) {
+                                        setActionParams({ ...actionParams, fields: [...fields, fs.id] })
+                                      } else {
+                                        setActionParams({ ...actionParams, fields: fields.filter((f: string) => f !== fs.id) })
+                                      }
+                                    }}
+                                  />
+                                  {fs.id} ({fs.type})
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: '#999', padding: 8 }}>
+                              暂无可用的状态变量
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            成功提示
+                          </label>
+                          <input
+                            type="text"
+                            value={actionParams.successMessage || ''}
+                            onChange={(e) => setActionParams({ ...actionParams, successMessage: e.target.value })}
+                            placeholder="提交成功"
+                            style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                          />
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            失败提示
+                          </label>
+                          <input
+                            type="text"
+                            value={actionParams.errorMessage || ''}
+                            onChange={(e) => setActionParams({ ...actionParams, errorMessage: e.target.value })}
+                            placeholder="提交失败"
+                            style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                          />
+                        </div>
+                      </>
+                    )}
+
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
                         className="forge-editor-btn forge-editor-btn--small forge-editor-btn--primary"
@@ -668,7 +766,16 @@ export function PropsPanel() {
                             ? { type: 'navigate', url: actionParams.url || '' }
                             : actionType === 'showToast'
                             ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as any }
-                            : { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
+                            : actionType === 'setState'
+                            ? { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
+                            : {
+                                type: 'submitForm',
+                                url: actionParams.url || '',
+                                method: actionParams.method || 'POST',
+                                fields: actionParams.fields || [],
+                                successMessage: actionParams.successMessage,
+                                errorMessage: actionParams.errorMessage,
+                              }
 
                           updateNodeEvents(node.id, eventName, [...actions, newAction])
                           setEditingEvent(null)

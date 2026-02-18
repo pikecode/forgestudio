@@ -1,6 +1,7 @@
 import React from 'react'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
 import { useEditorStore } from '../store'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ComponentPanel } from './ComponentPanel'
 import { Canvas } from './Canvas'
 import { PropsPanel } from './PropsPanel'
@@ -8,12 +9,17 @@ import { CodePreviewPanel } from './CodePreviewPanel'
 import { DataSourcePanel } from './DataSourcePanel'
 import { PreviewPanel } from './PreviewPanel'
 import { Toolbar } from './Toolbar'
+import { TreePanel } from './TreePanel'
+import { PageManager } from './PageManager'
 
 export function EditorLayout() {
   const addNode = useEditorStore((s) => s.addNode)
   const schema = useEditorStore((s) => s.schema)
   const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
   const [draggingName, setDraggingName] = React.useState<string | null>(null)
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts()
 
   const handleDragStart = (event: DragStartEvent) => {
     const data = event.active.data.current
@@ -52,7 +58,11 @@ export function EditorLayout() {
       <div className="forge-editor">
         <Toolbar />
         <div className="forge-editor__body">
-          <ComponentPanel />
+          <div className="forge-editor__left-panels">
+            <PageManager />
+            <ComponentPanel />
+            <TreePanel />
+          </div>
           <Canvas />
           {rightPanelTab === 'props' && <PropsPanel />}
           {rightPanelTab === 'datasource' && <DataSourcePanel />}
