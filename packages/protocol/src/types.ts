@@ -6,14 +6,25 @@
 export interface FSPSchema {
   version: string
   meta: FSPMeta
-  componentTree: ComponentNode
+  componentTree: ComponentNode  // Deprecated: use pages instead (kept for backward compatibility)
   dataSources?: DataSourceDef[]
   formStates?: FormStateDef[]
+  /** Multi-page support (M3) */
+  pages?: PageDef[]
 }
 
 export interface FSPMeta {
   name: string
   description?: string
+}
+
+/** Page definition for multi-page apps (M3) */
+export interface PageDef {
+  id: string
+  name: string  // e.g. 'index', 'detail', 'profile'
+  title: string  // Display name
+  path: string  // Route path, e.g. '/pages/index/index'
+  componentTree: ComponentNode
 }
 
 /** Form state definition for Input bindings (M1.4) */
@@ -66,6 +77,7 @@ export type Action =
   | NavigateAction
   | ShowToastAction
   | SetStateAction
+  | SubmitFormAction
 
 export interface NavigateAction {
   type: 'navigate'
@@ -82,6 +94,15 @@ export interface SetStateAction {
   type: 'setState'
   target: string  // state variable name
   value: string   // expression or literal
+}
+
+export interface SubmitFormAction {
+  type: 'submitForm'
+  url: string  // API endpoint
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  fields: string[]  // state variable names to collect
+  successMessage?: string
+  errorMessage?: string
 }
 
 // ============================================================

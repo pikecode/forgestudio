@@ -11,6 +11,13 @@ const COMPONENT_MAP: Record<string, TaroComponentMapping> = {
   Input: { taroTag: 'Input', importSource: '@tarojs/components' },
   List: { taroTag: 'View', importSource: '@tarojs/components' },
   Card: { taroTag: 'View', importSource: '@tarojs/components' },
+  Switch: { taroTag: 'Switch', importSource: '@tarojs/components' },
+  Textarea: { taroTag: 'Textarea', importSource: '@tarojs/components' },
+  ScrollView: { taroTag: 'ScrollView', importSource: '@tarojs/components' },
+  Form: { taroTag: 'Form', importSource: '@tarojs/components' },
+  Swiper: { taroTag: 'Swiper', importSource: '@tarojs/components' },
+  SwiperItem: { taroTag: 'SwiperItem', importSource: '@tarojs/components' },
+  Modal: { taroTag: 'View', importSource: '@tarojs/components' }, // Modal uses View for now
 }
 
 export function getTaroMapping(tag: string): TaroComponentMapping {
