@@ -363,11 +363,18 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     importSchema: (schema) => {
       const pageId = schema.pages?.[0]?.id ?? null
+      const importedSchema = structuredClone(schema)
+
+      // Load first page's componentTree into schema.componentTree
+      if (pageId && schema.pages?.[0]) {
+        importedSchema.componentTree = structuredClone(schema.pages[0].componentTree)
+      }
+
       set({
-        schema,
+        schema: importedSchema,
         selectedNodeId: null,
         currentPageId: pageId,
-        history: [{ schema: structuredClone(schema), currentPageId: pageId }],
+        history: [{ schema: structuredClone(importedSchema), currentPageId: pageId }],
         historyIndex: 0,
       })
     },
