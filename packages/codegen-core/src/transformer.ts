@@ -1,5 +1,6 @@
-import type { ComponentNode, FSPSchema, Action, DataSourceDef } from '@forgestudio/protocol'
+import type { ComponentNode, FSPSchema, Action, DataSourceDef, PageDef } from '@forgestudio/protocol'
 import type {
+  IRProject,
   IRPage,
   IRRenderNode,
   IRTextContent,
@@ -10,6 +11,35 @@ import type {
   IRHandler,
 } from './ir'
 import { camelToKebab, formatStyleValue } from './style-utils'
+
+/**
+ * Transform FSP schema to IR project (supports multi-page)
+ */
+export function transformFSPtoIR(schema: FSPSchema): IRProject {
+  const pages: IRPage[] = []
+
+  // Handle multi-page schema (M3)
+  if (schema.pages && schema.pages.length > 0) {
+    for (const pageDef of schema.pages) {
+      pages.push(transformPageToIR(schema, pageDef))
+    }
+  } else {
+    // Backward compatibility: single page from componentTree
+    const defaultPage: PageDef = {
+      id: 'page_index',
+      name: 'index',
+      title: schema.meta.name || 'Index',
+      path: '/pages/index/index',
+      componentTree: schema.componentTree,
+    }
+    pages.push(transformPageToIR(schema, defaultPage))
+  }
+
+  return {
+    pages,
+    appName: schema.meta.name || 'ForgeStudio App',
+  }
+}
 
 /**
  * Topological sort for data sources based on dependencies
@@ -52,7 +82,10 @@ function sortDataSourcesByDependency(dataSources: DataSourceDef[]): DataSourceDe
   return sorted
 }
 
-export function transformFSPtoIR(schema: FSPSchema): IRPage {
+/**
+ * Transform a single page definition to IR
+ */
+function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
   const styleRules: IRStyleRule[] = []
   const stateVars: IRStateVar[] = []
   const effects: IREffect[] = []
@@ -85,7 +118,7 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
 
       effects.push({
         trigger: 'mount',
-        body: `${dependencyCheck}Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(() => {})`,
+        body: `${dependencyCheck}Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n      })`,
       })
     }
   }
@@ -109,6 +142,23 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
           return `Taro.showToast({ title: '${action.title}', icon: '${action.icon || 'success'}' })`
         case 'setState':
           return `set${action.target.charAt(0).toUpperCase() + action.target.slice(1)}(${action.value})`
+        case 'submitForm':
+          const dataObj = action.fields.map(f => `      ${f}`).join(',\n')
+          return `e.preventDefault()
+    Taro.request({
+      url: '${action.url}',
+      method: '${action.method}',
+      data: {
+${dataObj}
+      }
+    })
+      .then(() => {
+        Taro.showToast({ title: '${action.successMessage || '提交成功'}', icon: 'success' })
+      })
+      .catch((err) => {
+        console.error('Form submission failed:', err)
+        Taro.showToast({ title: '${action.errorMessage || '提交失败'}', icon: 'error' })
+      })`
         default:
           return ''
       }
@@ -119,7 +169,8 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
   // Check if handler needs event parameter (e.g., onChange with e.detail.value)
   function needsEventParam(actions: Action[]): boolean {
     return actions.some(action =>
-      action.type === 'setState' && action.value.includes('e.detail')
+      (action.type === 'setState' && action.value.includes('e.detail')) ||
+      action.type === 'submitForm'
     )
   }
 
@@ -214,10 +265,13 @@ export function transformFSPtoIR(schema: FSPSchema): IRPage {
     }
   }
 
-  const renderTree = transformNode(schema.componentTree)!
+  const renderTree = transformNode(pageDef.componentTree)!
 
   return {
-    name: schema.meta.name || 'index',
+    id: pageDef.id,
+    name: pageDef.name,
+    title: pageDef.title,
+    path: pageDef.path,
     imports: [],       // filled by the codegen plugin
     stateVars,
     effects,

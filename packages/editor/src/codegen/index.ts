@@ -6,6 +6,6 @@ import { TaroCodegenPlugin } from '@forgestudio/codegen-taro'
 const taroPlugin = new TaroCodegenPlugin()
 
 export function generateTaroProject(schema: FSPSchema): GeneratedProject {
-  const ir = transformFSPtoIR(schema)
-  return taroPlugin.generate(ir)
+  const irProject = transformFSPtoIR(schema)
+  return taroPlugin.generate(irProject)
 }

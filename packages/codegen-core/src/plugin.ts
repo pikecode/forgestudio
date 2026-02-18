@@ -1,8 +1,9 @@
-import type { IRPage } from './ir'
+import type { IRProject, IRPage } from './ir'
 
 export interface CodegenPlugin {
   name: string
-  generate(ir: IRPage): GeneratedProject
+  generate(ir: IRProject): GeneratedProject
+  generatePage?(ir: IRPage): { tsx: string; scss: string }  // Optional: generate single page
 }
 
 export interface GeneratedProject {

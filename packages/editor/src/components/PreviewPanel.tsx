@@ -4,17 +4,23 @@ import { transformFSPtoIR, renderIRToHTML } from '@forgestudio/codegen-core'
 
 export function PreviewPanel() {
   const schema = useEditorStore((s) => s.schema)
+  const currentPageId = useEditorStore((s) => s.currentPageId)
   const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
 
   const html = useMemo(() => {
     try {
-      const ir = transformFSPtoIR(schema)
-      return renderIRToHTML(ir)
+      const irProject = transformFSPtoIR(schema)
+      // Find the current page in the IR project
+      const currentPage = irProject.pages.find(p => p.id === currentPageId) || irProject.pages[0]
+      if (!currentPage) {
+        return `<html><body><p style="color:red;padding:16px;">未找到页面</p></body></html>`
+      }
+      return renderIRToHTML(currentPage)
     } catch (e) {
       return `<html><body><p style="color:red;padding:16px;">渲染失败: ${(e as Error).message}</p></body></html>`
     }
-  }, [schema])
+  }, [schema, currentPageId])
 
   return (
     <div className="forge-editor-panel forge-editor-panel--right forge-editor-panel--preview">

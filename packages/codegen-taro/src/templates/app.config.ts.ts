@@ -1,6 +1,10 @@
-export function generateAppConfig(): string {
+export function generateAppConfig(pages: Array<{ name: string; path: string; title: string }>): string {
+  const pagePaths = pages.map(p => `'${p.path}'`).join(',\n    ')
+
   return `export default defineAppConfig({
-  pages: ['pages/index/index'],
+  pages: [
+    ${pagePaths}
+  ],
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#fff',

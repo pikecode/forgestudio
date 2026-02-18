@@ -1,7 +1,15 @@
 // Intermediate Representation types for code generation
 
+export interface IRProject {
+  pages: IRPage[]
+  appName: string
+}
+
 export interface IRPage {
-  name: string
+  id: string                 // page id from schema
+  name: string               // page name (e.g., 'index', 'detail')
+  title: string              // page title for display
+  path: string               // route path (e.g., '/pages/index/index')
   imports: IRImport[]
   stateVars: IRStateVar[]    // empty in M1.2, for M1.3+
   effects: IREffect[]        // empty in M1.2, for M1.3+

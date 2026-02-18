@@ -16,6 +16,9 @@ function convertExprVars(expr: string): string {
 }
 
 export function generateTSX(ir: IRPage): string {
+  // Extract filename from page name (e.g., 'index' or 'detail')
+  const scssFileName = ir.name || 'index'
+
   // Collect all unique Taro component imports
   const usedComponents = new Set<string>()
   collectTags(ir.renderTree, usedComponents)
@@ -95,7 +98,7 @@ function extractList(data: any): any[] {
 ` : ''
 
   return `${stateImport}${importLine}
-import './index.scss'
+import './${scssFileName}.scss'
 ${extractListFn}
 export default function Index() {
 ${bodyStr}  return (
