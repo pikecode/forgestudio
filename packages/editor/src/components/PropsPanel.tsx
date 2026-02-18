@@ -10,6 +10,10 @@ import {
   EnumSetter,
   ColorSetter,
   ExpressionSetter,
+  SpacingSetter,
+  LayoutSetter,
+  TypographySetter,
+  BorderSetter,
 } from '../setters'
 
 /** Find the ancestor List node that has a loop binding */
@@ -230,158 +234,179 @@ export function PropsPanel() {
         )
       })}
 
-      {/* Styles Section (M1.6) */}
+      {/* Styles Section - Visual Style Editors */}
       <div className="forge-editor-panel__section">样式</div>
       <div style={{ padding: '8px 12px' }}>
-        {/* Width */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            宽度
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.width ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { width: val || undefined })
-            }}
-            placeholder="auto"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
-          />
-        </div>
-
-        {/* Height */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            高度
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.height ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { height: val || undefined })
-            }}
-            placeholder="auto"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
-          />
-        </div>
-
-        {/* Padding */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            内边距 (padding)
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.padding ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { padding: val || undefined })
-            }}
-            placeholder="0"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
-          />
-        </div>
-
-        {/* Margin */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            外边距 (margin)
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.margin ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { margin: val || undefined })
-            }}
-            placeholder="0"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
-          />
-        </div>
-
-        {/* Background Color */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            背景色
-          </label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="color"
-              value={String(node.styles.backgroundColor ?? '#ffffff')}
-              onChange={(e) => updateNodeStyles(node.id, { backgroundColor: e.target.value })}
-              style={{ width: 40, height: 32, border: '1px solid #d0d0d0', borderRadius: 4 }}
-            />
+        {/* Size Section */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>尺寸</div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
+              宽度
+            </label>
             <input
               type="text"
-              value={String(node.styles.backgroundColor ?? '')}
+              value={String(node.styles.width ?? '')}
               onChange={(e) => {
                 const val = e.target.value.trim()
-                updateNodeStyles(node.id, { backgroundColor: val || undefined })
+                updateNodeStyles(node.id, { width: val || undefined })
               }}
-              placeholder="#ffffff"
-              style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+              placeholder="auto"
+              style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
+              高度
+            </label>
+            <input
+              type="text"
+              value={String(node.styles.height ?? '')}
+              onChange={(e) => {
+                const val = e.target.value.trim()
+                updateNodeStyles(node.id, { height: val || undefined })
+              }}
+              placeholder="auto"
+              style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
             />
           </div>
         </div>
 
-        {/* Text Color */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            文字颜色
-          </label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="color"
-              value={String(node.styles.color ?? '#000000')}
-              onChange={(e) => updateNodeStyles(node.id, { color: e.target.value })}
-              style={{ width: 40, height: 32, border: '1px solid #d0d0d0', borderRadius: 4 }}
-            />
-            <input
-              type="text"
-              value={String(node.styles.color ?? '')}
-              onChange={(e) => {
-                const val = e.target.value.trim()
-                updateNodeStyles(node.id, { color: val || undefined })
-              }}
-              placeholder="#000000"
-              style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
-            />
-          </div>
-        </div>
-
-        {/* Font Size */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            字体大小
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.fontSize ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { fontSize: val || undefined })
+        {/* Spacing Section */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>间距</div>
+          <SpacingSetter
+            label="内边距"
+            type="padding"
+            value={{
+              top: node.styles.paddingTop,
+              right: node.styles.paddingRight,
+              bottom: node.styles.paddingBottom,
+              left: node.styles.paddingLeft,
             }}
-            placeholder="14px"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+            onChange={(value) => {
+              updateNodeStyles(node.id, {
+                paddingTop: value.top,
+                paddingRight: value.right,
+                paddingBottom: value.bottom,
+                paddingLeft: value.left,
+              })
+            }}
+          />
+          <div style={{ height: 12 }} />
+          <SpacingSetter
+            label="外边距"
+            type="margin"
+            value={{
+              top: node.styles.marginTop,
+              right: node.styles.marginRight,
+              bottom: node.styles.marginBottom,
+              left: node.styles.marginLeft,
+            }}
+            onChange={(value) => {
+              updateNodeStyles(node.id, {
+                marginTop: value.top,
+                marginRight: value.right,
+                marginBottom: value.bottom,
+                marginLeft: value.left,
+              })
+            }}
           />
         </div>
 
-        {/* Border Radius */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
-            圆角 (borderRadius)
-          </label>
-          <input
-            type="text"
-            value={String(node.styles.borderRadius ?? '')}
-            onChange={(e) => {
-              const val = e.target.value.trim()
-              updateNodeStyles(node.id, { borderRadius: val || undefined })
+        {/* Layout Section - only for containers */}
+        {(meta?.allowChildren || node.component === 'View' || node.component === 'Card') && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>布局</div>
+            <LayoutSetter
+              value={{
+                display: node.styles.display,
+                flexDirection: node.styles.flexDirection,
+                justifyContent: node.styles.justifyContent,
+                alignItems: node.styles.alignItems,
+                gap: node.styles.gap,
+              }}
+              onChange={(value) => {
+                updateNodeStyles(node.id, value)
+              }}
+            />
+          </div>
+        )}
+
+        {/* Typography Section */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>文字</div>
+          <TypographySetter
+            value={{
+              fontSize: node.styles.fontSize,
+              fontWeight: node.styles.fontWeight,
+              lineHeight: node.styles.lineHeight,
+              textAlign: node.styles.textAlign,
             }}
-            placeholder="0"
-            style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+            onChange={(value) => {
+              updateNodeStyles(node.id, value)
+            }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
+              文字颜色
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="color"
+                value={String(node.styles.color ?? '#000000')}
+                onChange={(e) => updateNodeStyles(node.id, { color: e.target.value })}
+                style={{ width: 40, height: 32, border: '1px solid #d0d0d0', borderRadius: 4 }}
+              />
+              <input
+                type="text"
+                value={String(node.styles.color ?? '')}
+                onChange={(e) => {
+                  const val = e.target.value.trim()
+                  updateNodeStyles(node.id, { color: val || undefined })
+                }}
+                placeholder="#000000"
+                style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Background & Border Section */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>背景 & 边框</div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>
+              背景色
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="color"
+                value={String(node.styles.backgroundColor ?? '#ffffff')}
+                onChange={(e) => updateNodeStyles(node.id, { backgroundColor: e.target.value })}
+                style={{ width: 40, height: 32, border: '1px solid #d0d0d0', borderRadius: 4 }}
+              />
+              <input
+                type="text"
+                value={String(node.styles.backgroundColor ?? '')}
+                onChange={(e) => {
+                  const val = e.target.value.trim()
+                  updateNodeStyles(node.id, { backgroundColor: val || undefined })
+                }}
+                placeholder="#ffffff"
+                style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
+              />
+            </div>
+          </div>
+          <BorderSetter
+            value={{
+              borderWidth: node.styles.borderWidth,
+              borderColor: node.styles.borderColor,
+              borderRadius: node.styles.borderRadius,
+            }}
+            onChange={(value) => {
+              updateNodeStyles(node.id, value)
+            }}
           />
         </div>
       </div>

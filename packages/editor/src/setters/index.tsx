@@ -308,3 +308,8 @@ export function ExpressionSetter({ label, value, onChange, context }: Expression
     </div>
   )
 }
+
+export { SpacingSetter } from './SpacingSetter'
+export { LayoutSetter } from './LayoutSetter'
+export { TypographySetter } from './TypographySetter'
+export { BorderSetter } from './BorderSetter'
