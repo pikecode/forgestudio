@@ -10,6 +10,11 @@ import {
   CardMeta,
   SwitchMeta,
   TextareaMeta,
+  ScrollViewMeta,
+  FormMeta,
+  SwiperMeta,
+  SwiperItemMeta,
+  ModalMeta,
 } from './meta'
 
 const registry = new Map<string, ComponentMeta>()
@@ -29,6 +34,11 @@ register(ListMeta)
 register(CardMeta)
 register(SwitchMeta)
 register(TextareaMeta)
+register(ScrollViewMeta)
+register(FormMeta)
+register(SwiperMeta)
+register(SwiperItemMeta)
+register(ModalMeta)
 
 export function getComponentMeta(name: string): ComponentMeta | undefined {
   return registry.get(name)

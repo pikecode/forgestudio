@@ -197,3 +197,73 @@ export const TextareaMeta: ComponentMeta = {
     { name: 'maxlength', title: '最大长度', type: 'number', default: 200 },
   ],
 }
+
+export const ScrollViewMeta: ComponentMeta = {
+  name: 'ScrollView',
+  title: '滚动容器',
+  icon: 'scroll',
+  category: 'layout',
+  allowChildren: true,
+  defaultProps: { scrollY: true, scrollX: false },
+  defaultStyles: { height: 300 },
+  propsSchema: [
+    { name: 'scrollY', title: '纵向滚动', type: 'boolean', default: true },
+    { name: 'scrollX', title: '横向滚动', type: 'boolean', default: false },
+    { name: 'height', title: '高度', type: 'number', default: 300 },
+  ],
+}
+
+export const FormMeta: ComponentMeta = {
+  name: 'Form',
+  title: '表单',
+  icon: 'file-text',
+  category: 'data',
+  allowChildren: true,
+  defaultProps: {},
+  defaultStyles: { padding: 12 },
+  supportedEvents: ['onSubmit'],
+  propsSchema: [],
+}
+
+export const SwiperMeta: ComponentMeta = {
+  name: 'Swiper',
+  title: '轮播',
+  icon: 'layers',
+  category: 'layout',
+  allowChildren: true,
+  allowedChildComponents: ['SwiperItem'],
+  defaultProps: { autoplay: false, interval: 3000, circular: false },
+  defaultStyles: { height: 200 },
+  propsSchema: [
+    { name: 'autoplay', title: '自动播放', type: 'boolean', default: false },
+    { name: 'interval', title: '间隔时间(ms)', type: 'number', default: 3000 },
+    { name: 'circular', title: '循环播放', type: 'boolean', default: false },
+    { name: 'height', title: '高度', type: 'number', default: 200 },
+  ],
+}
+
+export const SwiperItemMeta: ComponentMeta = {
+  name: 'SwiperItem',
+  title: '轮播项',
+  icon: 'square',
+  category: 'layout',
+  allowChildren: true,
+  defaultProps: {},
+  defaultStyles: { width: '100%', height: '100%' },
+  propsSchema: [],
+}
+
+export const ModalMeta: ComponentMeta = {
+  name: 'Modal',
+  title: '弹窗',
+  icon: 'message-square',
+  category: 'layout',
+  allowChildren: true,
+  defaultProps: { title: '提示', visible: false },
+  defaultStyles: {},
+  propsSchema: [
+    { name: 'title', title: '标题', type: 'string', default: '提示' },
+    { name: 'visible', title: '是否显示', type: 'boolean', default: false },
+  ],
+}
+
