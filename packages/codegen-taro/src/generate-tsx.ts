@@ -2,6 +2,7 @@ import type {
   IRPage,
   IRRenderNode,
   IRTextContent,
+  IRHandler,
 } from '@forgestudio/codegen-core'
 import { getTaroMapping } from './component-map'
 import { mapProps } from './prop-map'
@@ -11,13 +12,16 @@ function convertExprVars(expr: string): string {
   return expr.trim()
     .replace(/\$state\.(\w+)/g, '$1')
     .replace(/\$item\.(\w+)/g, 'item.$1')
+    // Handle data source field access: $ds.dataSourceId.fieldName -> dataSourceIdData?.fieldName
+    .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
+    // Handle data source data access: $ds.dataSourceId.data -> dataSourceIdData
     .replace(/\$ds\.(\w+)\.data/g, '$1Data')
     .replace(/^\$/, '')  // fallback: strip leading $ for simple $item references
 }
 
 export function generateTSX(ir: IRPage): string {
-  // Extract filename from page name (e.g., 'index' or 'detail')
-  const scssFileName = ir.name || 'index'
+  // Extract filename from page path (e.g., '/pages/detail/index' -> 'index')
+  const scssFileName = ir.path.split('/').pop() || 'index'
 
   // Collect all unique Taro component imports
   const usedComponents = new Set<string>()
@@ -71,7 +75,7 @@ export function generateTSX(ir: IRPage): string {
     return `  const ${h.name} = (${params}${paramType}) => {\n    ${h.body}\n  }`
   }).join('\n\n')
 
-  const jsx = renderNode(ir.renderTree, 2)
+  const jsx = renderNode(ir.renderTree, 2, ir.handlers, false, 'item')
 
   const bodyParts: string[] = []
   if (stateDecls) bodyParts.push(stateDecls)
@@ -116,10 +120,10 @@ function collectTags(node: IRRenderNode, set: Set<string>) {
   }
 }
 
-function renderNode(node: IRRenderNode, indent: number): string {
+function renderNode(node: IRRenderNode, indent: number, handlers: IRHandler[], insideLoop: boolean, itemVar: string): string {
   const pad = ' '.repeat(indent)
   const { taroTag } = getTaroMapping(node.tag)
-  const propsStr = buildPropsString(taroTag, node)
+  const propsStr = buildPropsString(taroTag, node, handlers, insideLoop, itemVar)
 
   // Handle conditional rendering (M1.5)
   let nodeJSX = ''
@@ -140,7 +144,7 @@ function renderNode(node: IRRenderNode, indent: number): string {
           }
           return `${pad}    ${text}`
         }
-        return renderNode(child as IRRenderNode, indent + 4)
+        return renderNode(child as IRRenderNode, indent + 4, handlers, true, itemVar)
       })
       .join('\n')
 
@@ -169,7 +173,7 @@ ${pad}))}`
           }
           return `${pad}  ${text}`
         }
-        return renderNode(child as IRRenderNode, indent + 2)
+        return renderNode(child as IRRenderNode, indent + 2, handlers, insideLoop, itemVar)
       })
       .join('\n')
 
@@ -188,13 +192,23 @@ ${pad})}`
   return nodeJSX
 }
 
-function buildPropsString(taroTag: string, node: IRRenderNode): string {
+function buildPropsString(taroTag: string, node: IRRenderNode, handlers: IRHandler[], insideLoop: boolean, itemVar: string): string {
   const parts: string[] = []
   if (node.className) {
     parts.push(`className="${node.className}"`)
   }
   const mapped = mapProps(taroTag, node.props)
   for (const [k, v] of Object.entries(mapped)) {
+    // Check if this is an event handler that needs item parameter
+    const propValue = node.props[k]
+    if (propValue && propValue.type === 'identifier' && insideLoop) {
+      const handler = handlers.find(h => h.name === propValue.name)
+      // If handler has 'item' parameter, wrap it in arrow function
+      if (handler && handler.params && handler.params.includes('item')) {
+        parts.push(`${k}={() => ${propValue.name}(${itemVar})}`)
+        continue
+      }
+    }
     parts.push(`${k}=${v}`)
   }
   return parts.length > 0 ? ' ' + parts.join(' ') : ''

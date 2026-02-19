@@ -1,4 +1,6 @@
-import { create } from 'zustand'
+import { create, StateCreator } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { current } from 'immer'
 import type { FSPSchema, ComponentNode, DataSourceDef, Action, FormStateDef, PageDef } from '@forgestudio/protocol'
 import type { GeneratedProject } from '@forgestudio/codegen-core'
 import {
@@ -13,6 +15,12 @@ import {
   addPage as addPageToSchema,
   removePage as removePageFromSchema,
   updatePage as updatePageInSchema,
+  addDataSourceToPage,
+  removeDataSourceFromPage,
+  updateDataSourceInPage,
+  addFormStateToPage,
+  removeFormStateFromPage,
+  updateFormStateInPage,
 } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
 import { generateTaroProject } from './codegen'
@@ -84,7 +92,7 @@ const MAX_HISTORY_SIZE = 50
 
 // Helper function to generate unique IDs
 function generateUniqueId(): string {
-  return `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  return `node_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 }
 
 // Helper function to clone node with new IDs
@@ -101,11 +109,11 @@ function cloneNodeWithNewIds(node: ComponentNode): ComponentNode {
   return cloned
 }
 
-// Helper function to save current state to history
-function saveToHistory(state: EditorState): Partial<EditorState> {
+// Helper function to save current state to history (mutates draft directly)
+function pushHistory(state: EditorState): void {
   const newHistory = state.history.slice(0, state.historyIndex + 1)
   newHistory.push({
-    schema: structuredClone(state.schema),
+    schema: current(state).schema,
     currentPageId: state.currentPageId,
   })
 
@@ -114,10 +122,8 @@ function saveToHistory(state: EditorState): Partial<EditorState> {
     newHistory.shift()
   }
 
-  return {
-    history: newHistory,
-    historyIndex: newHistory.length - 1,
-  }
+  state.history = newHistory
+  state.historyIndex = newHistory.length - 1
 }
 
 // Helper function to sync componentTree changes back to pages array
@@ -130,7 +136,7 @@ function syncCurrentPageTree(state: EditorState): void {
   }
 }
 
-export const useEditorStore = create<EditorState>((set, get) => {
+const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = (set, get) => {
   const initialSchema = createEmptySchema()
   const initialPageId = initialSchema.pages?.[0]?.id ?? null
 
@@ -156,9 +162,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     addNode: (parentId, componentName, index) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const parent = findNodeById(schema.componentTree, parentId)
-        if (!parent) return state
+        const parent = findNodeById(state.schema.componentTree, parentId)
+        if (!parent) return
         if (!parent.children) parent.children = []
 
         const meta = getComponentMeta(componentName)
@@ -203,159 +208,178 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
         const i = index ?? parent.children.length
         parent.children.splice(i, 0, node)
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, selectedNodeId: node.id, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        state.selectedNodeId = node.id
+        pushHistory(state)
       })
     },
 
     removeNode: (nodeId) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        removeNodeFromTree(schema.componentTree, nodeId)
-        syncCurrentPageTree({ ...state, schema })
-        return {
-          schema,
-          selectedNodeId:
-            state.selectedNodeId === nodeId ? null : state.selectedNodeId,
-          ...saveToHistory({ ...state, schema }),
+        removeNodeFromTree(state.schema.componentTree, nodeId)
+        syncCurrentPageTree(state)
+        if (state.selectedNodeId === nodeId) {
+          state.selectedNodeId = null
         }
+        pushHistory(state)
       })
     },
 
     moveNode: (nodeId, targetParentId, index) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        moveNodeInTree(schema.componentTree, nodeId, targetParentId, index)
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        moveNodeInTree(state.schema.componentTree, nodeId, targetParentId, index)
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     updateNodeProps: (nodeId, props) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node) return
         Object.assign(node.props, props)
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     updateNodeStyles: (nodeId, styles) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node) return
         Object.assign(node.styles, styles)
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     updateNodeLoop: (nodeId, loop) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node) return
         node.loop = loop
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     updateNodeCondition: (nodeId, condition) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node) return
         node.condition = condition
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     addDataSource: (ds) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        if (!schema.dataSources) schema.dataSources = []
-        // Find next available ID to avoid collisions after deletions
-        let count = schema.dataSources.length + 1
-        const existingIds = new Set(schema.dataSources.map(d => d.id))
-        while (existingIds.has(`ds${count}`)) count++
-        const id = `ds${count}`
-        schema.dataSources.push({ ...ds, id } as DataSourceDef)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        // Use label as ID (convert to camelCase, preserve Chinese)
+        const baseName = ds.label || 'dataSource'
+        const camelCaseId = baseName
+          .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+(.)/g, (_, chr) => chr.toUpperCase())
+          .replace(/^[A-Z]/, (chr) => chr.toLowerCase())
+          .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '')  // Keep Chinese characters
+
+        // Fallback to timestamp if ID is empty (e.g., all special chars)
+        const finalId = camelCaseId || `ds_${Date.now()}`
+
+        // Ensure uniqueness by adding suffix if needed
+        const existingIds = new Set(currentPage.dataSources?.map(d => d.id) ?? [])
+        let id = finalId
+        let suffix = 1
+        while (existingIds.has(id)) {
+          id = `${finalId}${suffix}`
+          suffix++
+        }
+
+        addDataSourceToPage(currentPage, { ...ds, id } as DataSourceDef)
+        pushHistory(state)
       })
     },
 
     updateDataSource: (id, updates) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const ds = schema.dataSources?.find((d) => d.id === id)
-        if (!ds) return state
-        Object.assign(ds, updates)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        const success = updateDataSourceInPage(currentPage, id, updates)
+        if (!success) return
+        pushHistory(state)
       })
     },
 
     removeDataSource: (id) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        if (!schema.dataSources) return state
-        schema.dataSources = schema.dataSources.filter((d) => d.id !== id)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        const success = removeDataSourceFromPage(currentPage, id)
+        if (!success) return
+        pushHistory(state)
       })
     },
 
     addFormState: (id, fs) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        if (!schema.formStates) schema.formStates = []
-        schema.formStates.push({ ...fs, id } as FormStateDef)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        addFormStateToPage(currentPage, { ...fs, id } as FormStateDef)
+        pushHistory(state)
       })
     },
 
     updateFormState: (id, updates) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const fs = schema.formStates?.find((f) => f.id === id)
-        if (!fs) return state
-        Object.assign(fs, updates)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        const success = updateFormStateInPage(currentPage, id, updates)
+        if (!success) return
+        pushHistory(state)
       })
     },
 
     removeFormState: (id) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        if (!schema.formStates) return state
-        schema.formStates = schema.formStates.filter((f) => f.id !== id)
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        const success = removeFormStateFromPage(currentPage, id)
+        if (!success) return
+        pushHistory(state)
       })
     },
 
     updateNodeEvents: (nodeId, eventName, actions) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node) return
         if (!node.events) node.events = {}
         node.events[eventName] = actions
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
     removeNodeEvent: (nodeId, eventName) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const node = findNodeById(schema.componentTree, nodeId)
-        if (!node || !node.events) return state
+        const node = findNodeById(state.schema.componentTree, nodeId)
+        if (!node || !node.events) return
         delete node.events[eventName]
-        syncCurrentPageTree({ ...state, schema })
-        return { schema, ...saveToHistory({ ...state, schema }) }
+        syncCurrentPageTree(state)
+        pushHistory(state)
       })
     },
 
@@ -364,6 +388,37 @@ export const useEditorStore = create<EditorState>((set, get) => {
     importSchema: (schema) => {
       const pageId = schema.pages?.[0]?.id ?? null
       const importedSchema = structuredClone(schema)
+
+      // Migrate legacy global dataSources/formStates to first page (M4)
+      if (importedSchema.pages && importedSchema.pages.length > 0) {
+        if (importedSchema.dataSources && importedSchema.dataSources.length > 0) {
+          importedSchema.pages[0].dataSources = importedSchema.dataSources
+          delete importedSchema.dataSources
+        }
+        if (importedSchema.formStates && importedSchema.formStates.length > 0) {
+          importedSchema.pages[0].formStates = importedSchema.formStates
+          delete importedSchema.formStates
+        }
+      }
+
+      // Migrate mockData → sampleData (M5 backward compatibility)
+      if (importedSchema.pages) {
+        for (const page of importedSchema.pages) {
+          if (page.dataSources) {
+            for (const ds of page.dataSources) {
+              const legacyDs = ds as any
+              if (legacyDs.mockData && !ds.sampleData) {
+                ds.sampleData = legacyDs.mockData
+                delete legacyDs.mockData
+              }
+              // Set default purpose if missing
+              if (!ds.purpose) {
+                ds.purpose = 'query'
+              }
+            }
+          }
+        }
+      }
 
       // Load first page's componentTree into schema.componentTree
       if (pageId && schema.pages?.[0]) {
@@ -431,16 +486,15 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     pasteNode: () => {
       set((state) => {
-        if (!state.clipboard) return state
-        if (!state.selectedNodeId) return state
+        if (!state.clipboard) return
+        if (!state.selectedNodeId) return
 
-        const schema = structuredClone(state.schema)
-        const selectedNode = findNodeById(schema.componentTree, state.selectedNodeId)
-        if (!selectedNode) return state
+        const selectedNode = findNodeById(state.schema.componentTree, state.selectedNodeId)
+        if (!selectedNode) return
 
         // Find parent of selected node
-        const parent = findParentNode(schema.componentTree, state.selectedNodeId)
-        if (!parent || !parent.children) return state
+        const parent = findParentNode(state.schema.componentTree, state.selectedNodeId)
+        if (!parent || !parent.children) return
 
         // Clone the clipboard node with new IDs
         const clonedNode = cloneNodeWithNewIds(state.clipboard)
@@ -449,12 +503,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
         const selectedIndex = parent.children.findIndex(c => c.id === state.selectedNodeId)
         parent.children.splice(selectedIndex + 1, 0, clonedNode)
 
-        syncCurrentPageTree({ ...state, schema })
-        return {
-          schema,
-          selectedNodeId: clonedNode.id,
-          ...saveToHistory({ ...state, schema })
-        }
+        syncCurrentPageTree(state)
+        state.selectedNodeId = clonedNode.id
+        pushHistory(state)
       })
     },
 
@@ -473,95 +524,77 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setCurrentPage: (pageId) => {
       set((state) => {
         const page = findPageById(state.schema, pageId)
-        if (!page) return state
-
-        const schema = structuredClone(state.schema)
+        if (!page) return
 
         // Save current page's componentTree back to pages array before switching
         if (state.currentPageId) {
-          const currentPage = findPageById(schema, state.currentPageId)
+          const currentPage = findPageById(state.schema, state.currentPageId)
           if (currentPage) {
-            currentPage.componentTree = schema.componentTree
+            currentPage.componentTree = state.schema.componentTree
           }
         }
 
         // Load the new page's componentTree
-        const targetPage = findPageById(schema, pageId)
+        const targetPage = findPageById(state.schema, pageId)
         if (targetPage) {
-          schema.componentTree = targetPage.componentTree
+          state.schema.componentTree = targetPage.componentTree
         }
 
-        return {
-          schema,
-          currentPageId: pageId,
-          selectedNodeId: null,
-        }
+        state.currentPageId = pageId
+        state.selectedNodeId = null
       })
     },
 
     addPage: (name, title) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-
         // Save current page's componentTree before switching
-        syncCurrentPageTree({ ...state, schema })
+        syncCurrentPageTree(state)
 
         const newPage = createEmptyPage(name, title)
-        addPageToSchema(schema, newPage)
+        addPageToSchema(state.schema, newPage)
 
         // Switch componentTree to the new page
-        schema.componentTree = newPage.componentTree
+        state.schema.componentTree = newPage.componentTree
 
-        return {
-          schema,
-          currentPageId: newPage.id,
-          selectedNodeId: null,
-          ...saveToHistory({ ...state, schema, currentPageId: newPage.id })
-        }
+        state.currentPageId = newPage.id
+        state.selectedNodeId = null
+        pushHistory(state)
       })
     },
 
     removePage: (pageId) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-
         // Don't allow removing the last page
-        if (!schema.pages || schema.pages.length <= 1) {
-          return state
+        if (!state.schema.pages || state.schema.pages.length <= 1) {
+          return
         }
 
-        const removed = removePageFromSchema(schema, pageId)
-        if (!removed) return state
+        const removed = removePageFromSchema(state.schema, pageId)
+        if (!removed) return
 
         // If we removed the current page, switch to the first page
-        let newCurrentPageId = state.currentPageId
         if (state.currentPageId === pageId) {
-          newCurrentPageId = schema.pages[0]?.id ?? null
-          if (newCurrentPageId) {
-            schema.componentTree = schema.pages[0].componentTree
+          state.currentPageId = state.schema.pages[0]?.id ?? null
+          if (state.currentPageId) {
+            state.schema.componentTree = state.schema.pages[0].componentTree
           }
         }
 
-        return {
-          schema,
-          currentPageId: newCurrentPageId,
-          selectedNodeId: null,
-          ...saveToHistory({ ...state, schema, currentPageId: newCurrentPageId })
-        }
+        state.selectedNodeId = null
+        pushHistory(state)
       })
     },
 
     updatePageMeta: (pageId, updates) => {
       set((state) => {
-        const schema = structuredClone(state.schema)
-        const updated = updatePageInSchema(schema, pageId, updates)
-        if (!updated) return state
+        const updated = updatePageInSchema(state.schema, pageId, updates)
+        if (!updated) return
 
-        return {
-          schema,
-          ...saveToHistory({ ...state, schema })
-        }
-            })
+        pushHistory(state)
+      })
     },
   }
-})
+}
+
+// @ts-ignore - Immer draft types leak into export, but functionality is correct
+export const useEditorStore = create<EditorState>()(immer(storeCreator))
