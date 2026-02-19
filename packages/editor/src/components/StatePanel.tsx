@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { FormStateDef } from '@forgestudio/protocol'
+import type { FormStateDef, ValidationRule } from '@forgestudio/protocol'
 
 interface StatePanelProps {
   formStates: FormStateDef[]
@@ -11,10 +11,11 @@ interface StatePanelProps {
 export function StatePanel({ formStates, addFormState, updateFormState, removeFormState }: StatePanelProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<{ id: string; type: string; defaultValue: any }>({
+  const [formData, setFormData] = useState<{ id: string; type: string; defaultValue: any; rules: ValidationRule[] }>({
     id: '',
     type: 'string',
     defaultValue: '',
+    rules: [],
   })
 
   const handleAdd = () => {
@@ -36,9 +37,10 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
     addFormState(formData.id, {
       type: formData.type as 'string' | 'number' | 'boolean',
       defaultValue,
+      rules: formData.rules.length > 0 ? formData.rules : undefined,
     })
     setIsAdding(false)
-    setFormData({ id: '', type: 'string', defaultValue: '' })
+    setFormData({ id: '', type: 'string', defaultValue: '', rules: [] })
   }
 
   const handleEdit = (fs: FormStateDef) => {
@@ -47,6 +49,7 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
       id: fs.id,
       type: fs.type,
       defaultValue: fs.defaultValue,
+      rules: fs.rules || [],
     })
   }
 
@@ -62,9 +65,10 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
     updateFormState(editingId, {
       type: formData.type as 'string' | 'number' | 'boolean',
       defaultValue,
+      rules: formData.rules.length > 0 ? formData.rules : undefined,
     })
     setEditingId(null)
-    setFormData({ id: '', type: 'string', defaultValue: '' })
+    setFormData({ id: '', type: 'string', defaultValue: '', rules: [] })
   }
 
   const handleDelete = (id: string) => {
@@ -151,7 +155,7 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
               className="forge-editor-btn forge-editor-btn--small"
               onClick={() => {
                 setIsAdding(false)
-                setFormData({ id: '', type: 'string', defaultValue: '' })
+                setFormData({ id: '', type: 'string', defaultValue: '', rules: [] })
               }}
             >
               取消
@@ -218,6 +222,116 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
                     />
                   )}
                 </div>
+
+                {/* Validation Rules */}
+                <details style={{ marginBottom: 8, border: '1px solid #e0e0e0', borderRadius: 4, padding: 6 }}>
+                  <summary style={{ fontSize: 12, color: '#555', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}>
+                    验证规则 {formData.rules.length > 0 && `(${formData.rules.length})`}
+                  </summary>
+                  <div style={{ marginTop: 8 }}>
+                    {/* Quick add buttons */}
+                    <div style={{ marginBottom: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => {
+                          if (!formData.rules.some(r => r.type === 'required')) {
+                            setFormData({ ...formData, rules: [...formData.rules, { type: 'required', message: '此字段为必填项' }] })
+                          }
+                        }}
+                        style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                      >
+                        + 必填
+                      </button>
+                      {formData.type === 'string' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const value = prompt('最小长度')
+                              if (value && !isNaN(Number(value))) {
+                                setFormData({ ...formData, rules: [...formData.rules, { type: 'minLength', value: Number(value), message: `最少${value}个字符` }] })
+                              }
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                          >
+                            + 最小长度
+                          </button>
+                          <button
+                            onClick={() => {
+                              const value = prompt('最大长度')
+                              if (value && !isNaN(Number(value))) {
+                                setFormData({ ...formData, rules: [...formData.rules, { type: 'maxLength', value: Number(value), message: `最多${value}个字符` }] })
+                              }
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                          >
+                            + 最大长度
+                          </button>
+                        </>
+                      )}
+                      {formData.type === 'number' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const value = prompt('最小值')
+                              if (value && !isNaN(Number(value))) {
+                                setFormData({ ...formData, rules: [...formData.rules, { type: 'min', value: Number(value), message: `最小值为${value}` }] })
+                              }
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                          >
+                            + 最小值
+                          </button>
+                          <button
+                            onClick={() => {
+                              const value = prompt('最大值')
+                              if (value && !isNaN(Number(value))) {
+                                setFormData({ ...formData, rules: [...formData.rules, { type: 'max', value: Number(value), message: `最大值为${value}` }] })
+                              }
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                          >
+                            + 最大值
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Rules list */}
+                    {formData.rules.map((rule, idx) => (
+                      <div key={idx} style={{ marginBottom: 6, padding: 6, backgroundColor: '#fafafa', borderRadius: 4, border: '1px solid #e0e0e0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: '#666', fontWeight: 500 }}>
+                            {rule.type === 'required' && '必填'}
+                            {rule.type === 'minLength' && `最小长度: ${rule.value}`}
+                            {rule.type === 'maxLength' && `最大长度: ${rule.value}`}
+                            {rule.type === 'min' && `最小值: ${rule.value}`}
+                            {rule.type === 'max' && `最大值: ${rule.value}`}
+                            {rule.type === 'pattern' && '正则匹配'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setFormData({ ...formData, rules: formData.rules.filter((_, i) => i !== idx) })
+                            }}
+                            style={{ padding: '1px 4px', fontSize: 10, color: '#ff4d4f', background: 'transparent', border: '1px solid #ff4d4f', borderRadius: 2, cursor: 'pointer' }}
+                          >
+                            删除
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={rule.message || ''}
+                          onChange={(e) => {
+                            const newRules = [...formData.rules]
+                            newRules[idx] = { ...newRules[idx], message: e.target.value }
+                            setFormData({ ...formData, rules: newRules })
+                          }}
+                          placeholder="错误提示信息"
+                          style={{ width: '100%', padding: '3px 6px', fontSize: 11, border: '1px solid #d0d0d0', borderRadius: 3 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </details>
+
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     className="forge-editor-btn forge-editor-btn--small forge-editor-btn--primary"
@@ -229,7 +343,7 @@ export function StatePanel({ formStates, addFormState, updateFormState, removeFo
                     className="forge-editor-btn forge-editor-btn--small"
                     onClick={() => {
                       setEditingId(null)
-                      setFormData({ id: '', type: 'string', defaultValue: '' })
+                      setFormData({ id: '', type: 'string', defaultValue: '', rules: [] })
                     }}
                   >
                     取消

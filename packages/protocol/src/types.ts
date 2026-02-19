@@ -52,6 +52,15 @@ export interface FormStateDef {
   id: string
   type: 'string' | 'number' | 'boolean'
   defaultValue?: string | number | boolean
+  /** Validation rules (M5) */
+  rules?: ValidationRule[]
+}
+
+/** Validation rule for form fields (M5) */
+export interface ValidationRule {
+  type: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'min' | 'max'
+  value?: string | number  // For minLength, maxLength, pattern, min, max
+  message?: string  // Custom error message
 }
 
 /** A single node in the component tree */
