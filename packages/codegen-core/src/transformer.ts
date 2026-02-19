@@ -185,6 +185,20 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
       })
     }
 
+    // Add page state for paginated data sources
+    if (ds.pagination) {
+      stateVars.push({
+        name: `${sanitizeVarName(ds.id)}Page`,
+        type: 'number',
+        defaultValue: 1,
+      })
+      stateVars.push({
+        name: `${sanitizeVarName(ds.id)}HasMore`,
+        type: 'boolean',
+        defaultValue: true,
+      })
+    }
+
     if (ds.autoFetch) {
       const capitalizedName = varName.charAt(0).toUpperCase() + varName.slice(1)
 
@@ -214,6 +228,22 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
         urlExpr = `'${urlExpr}'`
       }
 
+      // Add pagination parameters if configured
+      if (ds.pagination) {
+        const pageParam = ds.pagination.pageParam || 'page'
+        const sizeParam = ds.pagination.sizeParam || 'pageSize'
+        const pageVar = `${sanitizeVarName(ds.id)}Page`
+        const separator = urlExpr.includes('?') ? '&' : '?'
+
+        if (urlExpr.startsWith("'")) {
+          // Static URL
+          urlExpr = `'${urlExpr.slice(1, -1)}${separator}${pageParam}=' + ${pageVar} + '&${sizeParam}=${ds.pagination.pageSize}'`
+        } else {
+          // Template URL
+          urlExpr = `${urlExpr.slice(0, -1)}${separator}${pageParam}=\${${pageVar}}&${sizeParam}=${ds.pagination.pageSize}\``
+        }
+      }
+
       // Generate different logic for object vs array
       let fetchBody: string
       // Build header object if headers are configured
@@ -225,7 +255,15 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
         fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        if (res.data) set${capitalizedName}(res.data)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
       } else {
         // Array type: use extractList helper
-        fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
+        if (ds.pagination) {
+          // Paginated: append data and update hasMore flag
+          const pageVar = `${sanitizeVarName(ds.id)}Page`
+          const hasMoreVar = `${sanitizeVarName(ds.id)}HasMore`
+          fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        const list = extractList(res.data)\n        if (${pageVar} === 1) {\n          set${capitalizedName}(list)\n        } else {\n          set${capitalizedName}(prev => [...prev, ...list])\n        }\n        set${hasMoreVar.charAt(0).toUpperCase() + hasMoreVar.slice(1)}(list.length >= ${ds.pagination.pageSize})\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
+        } else {
+          // Non-paginated: replace data
+          fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
+        }
       }
 
       // Build dependency list for useEffect
@@ -241,6 +279,30 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
         body: fetchBody,
         dependencies: effectDeps.length > 0 ? effectDeps : undefined,
       })
+
+      // Add effect to refetch when page changes (for pagination)
+      if (ds.pagination && !isObjectType) {
+        const pageVar = `${sanitizeVarName(ds.id)}Page`
+        effects.push({
+          trigger: 'mount',
+          body: fetchBody,
+          dependencies: [pageVar],
+        })
+      }
+
+      // Generate loadMore handler for paginated data sources
+      if (ds.pagination && !isObjectType) {
+        const pageVar = `${sanitizeVarName(ds.id)}Page`
+        const hasMoreVar = `${sanitizeVarName(ds.id)}HasMore`
+        const loadingVar = `${sanitizeVarName(ds.id)}Loading`
+
+        const loadMoreBody = `if (!${hasMoreVar} || ${loadingVar}) return\n    set${pageVar.charAt(0).toUpperCase() + pageVar.slice(1)}(prev => prev + 1)`
+
+        handlers.push({
+          name: `load${capitalizedName.replace('Data', '')}More`,
+          body: loadMoreBody,
+        })
+      }
     }
   }
 
