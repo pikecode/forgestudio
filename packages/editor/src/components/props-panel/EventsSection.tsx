@@ -12,6 +12,7 @@ export function EventsSection() {
   const removeNode = useEditorStore((s) => s.removeNode)
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
+  const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
   const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm'>('showToast')
   const [actionParams, setActionParams] = useState<Record<string, any>>({})
 
@@ -24,13 +25,23 @@ export function EventsSection() {
   const meta = getComponentMeta(node.component)
 
   const handleSaveAction = (eventName: string, actions: Action[]) => {
+    // Build params object from params array for navigate action
+    let params: Record<string, string> | undefined
+    if (actionType === 'navigate' && actionParams.params && Array.isArray(actionParams.params)) {
+      const paramsArray = actionParams.params.filter((p: any) => p.key && p.value)
+      if (paramsArray.length > 0) {
+        params = {}
+        paramsArray.forEach((p: any) => {
+          params![p.key] = p.value
+        })
+      }
+    }
+
     const newAction: Action = actionType === 'navigate'
       ? {
           type: 'navigate',
           url: actionParams.url === '__custom__' ? (actionParams.customUrl || '') : (actionParams.url || ''),
-          params: actionParams.paramKey && actionParams.paramValue
-            ? { [actionParams.paramKey]: actionParams.paramValue }
-            : undefined,
+          params,
         }
       : actionType === 'showToast'
       ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as 'success' | 'error' | 'loading' | 'none' | undefined }
@@ -44,8 +55,15 @@ export function EventsSection() {
           successMessage: actionParams.successMessage,
           errorMessage: actionParams.errorMessage,
         }
-    updateNodeEvents(node.id, eventName, [...actions, newAction])
+
+    // If editing, replace the action at the index; otherwise, append
+    const updatedActions = editingActionIndex !== null
+      ? actions.map((a, i) => i === editingActionIndex ? newAction : a)
+      : [...actions, newAction]
+
+    updateNodeEvents(node.id, eventName, updatedActions)
     setEditingEvent(null)
+    setEditingActionIndex(null)
     setActionParams({})
   }
 
@@ -71,18 +89,60 @@ export function EventsSection() {
                       {action.type === 'setState' && `设置状态: ${action.target} = ${action.value}`}
                       {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields.length}个字段)`}
                     </span>
-                    <button
-                      onClick={() => updateNodeEvents(node.id, eventName, actions.filter((_, i) => i !== idx))}
-                      style={{ padding: '2px 6px', fontSize: 11, color: '#ff4d4f', background: 'transparent', border: '1px solid #ff4d4f', borderRadius: 3, cursor: 'pointer' }}
-                    >
-                      删除
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => {
+                          // Pre-fill form with existing action data
+                          setEditingEvent(eventName)
+                          setEditingActionIndex(idx)
+                          setActionType(action.type as any)
+
+                          // Convert action to actionParams format
+                          if (action.type === 'navigate') {
+                            const params = action.params
+                              ? Object.entries(action.params).map(([key, value]) => ({ key, value }))
+                              : []
+                            setActionParams({
+                              url: action.url,
+                              params,
+                            })
+                          } else if (action.type === 'showToast') {
+                            setActionParams({
+                              title: action.title,
+                              icon: action.icon,
+                            })
+                          } else if (action.type === 'setState') {
+                            setActionParams({
+                              target: action.target,
+                              value: action.value,
+                            })
+                          } else if (action.type === 'submitForm') {
+                            setActionParams({
+                              url: action.url,
+                              method: action.method,
+                              fields: action.fields,
+                              successMessage: action.successMessage,
+                              errorMessage: action.errorMessage,
+                            })
+                          }
+                        }}
+                        style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: 'transparent', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => updateNodeEvents(node.id, eventName, actions.filter((_, i) => i !== idx))}
+                        style={{ padding: '2px 6px', fontSize: 11, color: '#ff4d4f', background: 'transparent', border: '1px solid #ff4d4f', borderRadius: 3, cursor: 'pointer' }}
+                      >
+                        删除
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!isEditing && (
                   <button
                     className="forge-editor-btn forge-editor-btn--small"
-                    onClick={() => { setEditingEvent(eventName); setActionType('showToast'); setActionParams({}) }}
+                    onClick={() => { setEditingEvent(eventName); setEditingActionIndex(null); setActionType('showToast'); setActionParams({}) }}
                     style={{ marginTop: 6 }}
                   >
                     添加动作
@@ -97,7 +157,7 @@ export function EventsSection() {
                     schema={schema}
                     pageFormStates={pageFormStates}
                     onSave={() => handleSaveAction(eventName, actions)}
-                    onCancel={() => { setEditingEvent(null); setActionParams({}) }}
+                    onCancel={() => { setEditingEvent(null); setEditingActionIndex(null); setActionParams({}) }}
                   />
                 )}
               </div>
@@ -188,14 +248,59 @@ function ActionEditor({
           <div style={{ marginTop: 8, padding: 8, border: '1px dashed #d0d0d0', borderRadius: 4, backgroundColor: '#fafafa' }}>
             <div style={{ fontSize: 12, color: '#555', fontWeight: 500, marginBottom: 6 }}>传递参数 (可选)</div>
             <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>传递给目标页面的参数，如 id。支持表达式如 {'{{$item.id}}'}</div>
-            <div style={{ marginBottom: 4 }}>
-              <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>参数名</label>
-              <input type="text" value={actionParams.paramKey || ''} onChange={(e) => setActionParams({ ...actionParams, paramKey: e.target.value })} placeholder="id" style={{ ...inputStyle, fontSize: 11, padding: '3px 6px' }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>参数值 (支持表达式)</label>
-              <input type="text" value={actionParams.paramValue || ''} onChange={(e) => setActionParams({ ...actionParams, paramValue: e.target.value })} placeholder="{{$item.id}}" style={{ ...inputStyle, fontSize: 11, padding: '3px 6px' }} />
-            </div>
+            {(actionParams.params || []).map((param: any, idx: number) => (
+              <div key={idx} style={{ marginBottom: 6, padding: 6, backgroundColor: '#fff', borderRadius: 4, border: '1px solid #e0e0e0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#666', fontWeight: 500 }}>参数 {idx + 1}</span>
+                  <button
+                    onClick={() => {
+                      const newParams = (actionParams.params || []).filter((_: any, i: number) => i !== idx)
+                      setActionParams({ ...actionParams, params: newParams })
+                    }}
+                    style={{ padding: '1px 4px', fontSize: 10, color: '#ff4d4f', background: 'transparent', border: '1px solid #ff4d4f', borderRadius: 2, cursor: 'pointer' }}
+                  >
+                    删除
+                  </button>
+                </div>
+                <div style={{ marginBottom: 3 }}>
+                  <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>参数名</label>
+                  <input
+                    type="text"
+                    value={param.key || ''}
+                    onChange={(e) => {
+                      const newParams = [...(actionParams.params || [])]
+                      newParams[idx] = { ...newParams[idx], key: e.target.value }
+                      setActionParams({ ...actionParams, params: newParams })
+                    }}
+                    placeholder="id"
+                    style={{ ...inputStyle, fontSize: 11, padding: '3px 6px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>参数值 (支持表达式)</label>
+                  <input
+                    type="text"
+                    value={param.value || ''}
+                    onChange={(e) => {
+                      const newParams = [...(actionParams.params || [])]
+                      newParams[idx] = { ...newParams[idx], value: e.target.value }
+                      setActionParams({ ...actionParams, params: newParams })
+                    }}
+                    placeholder="{{$item.id}}"
+                    style={{ ...inputStyle, fontSize: 11, padding: '3px 6px' }}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const newParams = [...(actionParams.params || []), { key: '', value: '' }]
+                setActionParams({ ...actionParams, params: newParams })
+              }}
+              style={{ padding: '4px 8px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer', width: '100%' }}
+            >
+              + 添加参数
+            </button>
           </div>
         </>
       )}

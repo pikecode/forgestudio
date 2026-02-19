@@ -95,23 +95,37 @@ export function generateTSX(ir: IRPage): string {
   const extractListFn = needsExtractList ? `
 /**
  * Auto-extract array data from API response
- * Supports: direct array, { data: [] }, { list: [] }, { results: [] }, etc.
+ * Supports: direct array, { data: [] }, { data: { list: [] } }, etc.
  */
 function extractList(data: any): any[] {
   if (Array.isArray(data)) return data
   if (data && typeof data === 'object') {
+    const keys = ['data', 'list', 'items', 'results', 'records', 'rows']
+    for (const k of keys) {
+      if (Array.isArray(data[k])) return data[k]
+    }
+    if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+      for (const k of keys) {
+        if (Array.isArray(data.data[k])) return data.data[k]
+      }
+    }
     for (const val of Object.values(data)) {
-      if (Array.isArray(val)) return val
+      if (Array.isArray(val)) return val as any[]
     }
   }
   return []
 }
 ` : ''
 
+  // Generate PascalCase component name from page name
+  const componentName = ir.name
+    .replace(/[-_](.)/g, (_, c) => c.toUpperCase())
+    .replace(/^(.)/, (_, c) => c.toUpperCase()) || 'Index'
+
   return `${stateImport}${importLine}
 import './${scssFileName}.scss'
 ${extractListFn}
-export default function Index() {
+export default function ${componentName}() {
 ${bodyStr}  return (
 ${jsx}
   )

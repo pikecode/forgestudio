@@ -12,14 +12,24 @@ export function extractListFromResponse(data: unknown): any[] {
   }
 
   if (data && typeof data === 'object') {
-    // 常见的数组字段名
-    const arrayFields = ['data', 'list', 'items', 'results', 'records']
+    const obj = data as Record<string, any>
+    // 优先匹配常见的数组字段名（支持两层嵌套）
+    const arrayFields = ['data', 'list', 'items', 'results', 'records', 'rows']
 
     for (const field of arrayFields) {
-      const value = (data as Record<string, any>)[field]
-      if (Array.isArray(value)) {
-        return value
+      if (Array.isArray(obj[field])) return obj[field]
+    }
+
+    // 检查嵌套：data.list, data.items 等
+    if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+      for (const field of arrayFields) {
+        if (Array.isArray(obj.data[field])) return obj.data[field]
       }
+    }
+
+    // 回退：第一个找到的数组值
+    for (const val of Object.values(obj)) {
+      if (Array.isArray(val)) return val
     }
   }
 
