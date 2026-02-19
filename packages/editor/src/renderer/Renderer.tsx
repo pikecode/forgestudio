@@ -297,20 +297,38 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
 }
 
 export function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
-  const schema = useEditorStore((s) => s.schema)
+  const getCurrentPage = useEditorStore((s) => s.getCurrentPage)
+  const currentPage = getCurrentPage()
 
-  // Build $state context from formStates
+  // Build $state context from formStates (M4: use page-level)
   const stateContext: Record<string, any> = {}
-  if (schema.formStates) {
-    for (const fs of schema.formStates) {
-      stateContext[fs.id] = fs.defaultValue
+  const pageFormStates = currentPage?.formStates ?? []
+  for (const fs of pageFormStates) {
+    stateContext[fs.id] = fs.defaultValue
+  }
+
+  // Build $param context for preview (mock parameters)
+  // In real app, these come from URL query params
+  // Dynamically detect required params from data sources
+  const paramContext: Record<string, any> = {}
+  const pageDataSources = currentPage?.dataSources ?? []
+  for (const ds of pageDataSources) {
+    const url = ds.options?.url || ''
+    const paramMatches = url.matchAll(/\{\{\$param\.(\w+)\}\}/g)
+    for (const match of paramMatches) {
+      const paramName = match[1]
+      // Provide mock value based on param name
+      if (!paramContext[paramName]) {
+        paramContext[paramName] = paramName === 'id' ? '1' : `mock_${paramName}`
+      }
     }
   }
 
-  // Merge context with $state
+  // Merge context with $state and $param
   const fullContext: ExpressionContext = {
     ...context,
     $state: stateContext,
+    $param: paramContext,
   }
 
   // Handle conditional rendering (M1.5) - now supports complex expressions
@@ -351,12 +369,12 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
     }
   }
 
-  // Handle loop rendering
+  // Handle loop rendering (M4: use page-level dataSources)
   if (node.loop) {
-    const dataSource = schema.dataSources?.find((ds) => ds.id === node.loop?.dataSourceId)
-    const mockDataObj = dataSource?.mockData as { data?: any[] } | undefined
-    const mockData = mockDataObj?.data ?? []
-    const items = mockData.slice(0, 3) // Preview 3 items
+    const pageDataSources = currentPage?.dataSources ?? []
+    const dataSource = pageDataSources.find((ds) => ds.id === node.loop?.dataSourceId)
+    const sampleData = dataSource?.sampleData ?? []
+    const items = sampleData.slice(0, 3) // Preview 3 items
 
     if (items.length === 0) {
       // No data - show helpful placeholder
@@ -374,7 +392,7 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
               ⚠️ 列表无数据
             </div>
             <div style={{ color: '#a16207', fontSize: 12 }}>
-              数据源 "{dsName}" 的 mockData.data 为空
+              数据源 "{dsName}" 的 sampleData 为空
             </div>
             <div style={{ color: '#a16207', fontSize: 11, marginTop: 6 }}>
               请在"数据源"标签页编辑 Mock 数据，例如：
@@ -387,10 +405,10 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
               borderRadius: 2,
               overflow: 'auto'
             }}>
-{`{"data": [
+{`[
   {"id": 1, "title": "示例1"},
   {"id": 2, "title": "示例2"}
-]}`}
+]`}
             </pre>
           </div>
         </EditWrapper>

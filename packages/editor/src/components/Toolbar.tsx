@@ -99,12 +99,6 @@ export function Toolbar() {
         >
           生成 Taro 代码
         </button>
-        <button
-          className="forge-editor-btn"
-          onClick={() => setRightPanelTab('preview')}
-        >
-          预览
-        </button>
       </div>
       <input
         ref={fileInputRef}

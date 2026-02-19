@@ -14,6 +14,63 @@ function mapTag(tag: string): string {
   return TAG_MAP[tag] ?? 'div'
 }
 
+/**
+ * Evaluate a condition expression with state variables
+ * Uses simple comparison logic instead of eval for security
+ */
+function evaluateCondition(expr: string, stateVars: IRStateVar[]): boolean {
+  try {
+    // Simple truthiness check for variables
+    const statePattern = /^\$state\.(\w+)$/
+    const match = expr.match(statePattern)
+    if (match) {
+      const varName = match[1]
+      const stateVar = stateVars.find(sv => sv.name === varName)
+      if (stateVar) {
+        const val = stateVar.defaultValue
+        return !!val && val !== '' && val !== 0
+      }
+      return false
+    }
+
+    // Simple comparison: $state.xxx > 0, $state.xxx === 'value', etc.
+    const compPattern = /^\$state\.(\w+)\s*([><=!]+)\s*(.+)$/
+    const compMatch = expr.match(compPattern)
+    if (compMatch) {
+      const [, varName, op, rightStr] = compMatch
+      const stateVar = stateVars.find(sv => sv.name === varName)
+      if (!stateVar) return false
+
+      const left = stateVar.defaultValue
+      // Parse right side (number, string, or boolean)
+      let right: any = rightStr.trim()
+      if (right === 'true') right = true
+      else if (right === 'false') right = false
+      else if (right.match(/^\d+$/)) right = Number(right)
+      else if (right.startsWith("'") && right.endsWith("'")) right = right.slice(1, -1)
+
+      // Perform comparison
+      switch (op) {
+        case '>': return Number(left) > Number(right)
+        case '<': return Number(left) < Number(right)
+        case '>=': return Number(left) >= Number(right)
+        case '<=': return Number(left) <= Number(right)
+        case '===': return left === right
+        case '!==': return left !== right
+        case '==': return left == right
+        case '!=': return left != right
+        default: return true
+      }
+    }
+
+    // Fallback: treat as truthy
+    return true
+  } catch (e) {
+    console.warn('Failed to evaluate condition:', expr, e)
+    return true // Show by default on error
+  }
+}
+
 export function renderIRToHTML(ir: IRPage): string {
   const css = renderCSS(ir.styles)
   const body = renderNode(ir.renderTree, ir.stateVars)
@@ -52,6 +109,12 @@ function renderCSS(styles: IRStyleSheet): string {
 }
 
 function renderNode(node: IRRenderNode, stateVars: IRStateVar[]): string {
+  // Handle conditional rendering
+  if (node.condition) {
+    const shouldRender = evaluateCondition(node.condition.expression, stateVars)
+    if (!shouldRender) return ''
+  }
+
   const htmlTag = mapTag(node.tag)
   const attrs = buildAttrs(htmlTag, node)
   const cls = node.className ? ` class="${node.className}"` : ''
@@ -63,7 +126,7 @@ function renderNode(node: IRRenderNode, stateVars: IRStateVar[]): string {
     if (data.length === 0) {
       return `<${htmlTag}${cls}${attrs}><span style="color:#999;padding:16px;display:block;">暂无数据</span></${htmlTag}>`
     }
-    const items = data.map((item, i) => {
+    const items = data.map((item) => {
       const childrenHTML = node.children
         .map(child => renderChildWithData(child, stateVars, node.loop!.itemVar, item))
         .join('\n')
@@ -126,7 +189,7 @@ function renderChildWithData(
   item: any,
 ): string {
   if ('type' in child && child.type === 'text') {
-    return resolveExpressions(child.value, itemVar, item)
+    return resolveExpressions(child.value, itemVar, item, stateVars)
   }
 
   const node = child as IRRenderNode
@@ -138,7 +201,7 @@ function renderChildWithData(
   if (node.children.length === 0) {
     if (node.tag === 'Button') {
       const text = extractPropValue(node.props, 'text') || '按钮'
-      const resolved = resolveExpressions(text, itemVar, item)
+      const resolved = resolveExpressions(text, itemVar, item, stateVars)
       const btnType = extractPropValue(node.props, 'type') || 'default'
       return `<button${cls}${attrs} style="${buttonStyle(btnType)}">${resolved}</button>`
     }
@@ -157,12 +220,14 @@ function renderChildWithData(
   return `<${htmlTag}${cls}${attrs}>${childrenHTML}</${htmlTag}>`
 }
 
-function resolveExpressions(text: string, itemVar: string, item: any): string {
+function resolveExpressions(text: string, itemVar: string, item: any, stateVars?: IRStateVar[]): string {
   if (!text.includes('{{')) return escapeHTML(text)
   return text.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
     const cleaned = expr.trim().replace(/^\$/, '')
     // e.g. "item.title" -> item["title"]
     const parts = cleaned.split('.')
+
+    // Handle $item.xxx
     if (parts[0] === itemVar && parts.length > 1) {
       let val: any = item
       for (let i = 1; i < parts.length; i++) {
@@ -170,6 +235,15 @@ function resolveExpressions(text: string, itemVar: string, item: any): string {
       }
       return escapeHTML(String(val ?? ''))
     }
+
+    // Handle $state.xxx
+    if (parts[0] === 'state' && parts.length > 1 && stateVars) {
+      const stateVar = stateVars.find(sv => sv.name === parts[1])
+      if (stateVar) {
+        return escapeHTML(String(stateVar.defaultValue ?? ''))
+      }
+    }
+
     return escapeHTML(cleaned)
   })
 }

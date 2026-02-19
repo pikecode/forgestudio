@@ -1,4 +1,5 @@
 import { create, StateCreator } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { current } from 'immer'
 import type { FSPSchema, ComponentNode, DataSourceDef, Action, FormStateDef, PageDef } from '@forgestudio/protocol'
@@ -21,6 +22,11 @@ import {
   addFormStateToPage,
   removeFormStateFromPage,
   updateFormStateInPage,
+  addGlobalDataSource,
+  removeGlobalDataSource,
+  updateGlobalDataSource,
+  getEffectiveDataSources,
+  togglePageGlobalDataSourceRef,
 } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
 import { generateTaroProject } from './codegen'
@@ -34,7 +40,7 @@ export interface EditorState {
   schema: FSPSchema
   selectedNodeId: string | null
   generatedProject: GeneratedProject | null
-  rightPanelTab: 'props' | 'datasource' | 'code' | 'preview'
+  rightPanelTab: 'props' | 'datasource' | 'code'
 
   // Multi-page management (M3)
   currentPageId: string | null
@@ -57,7 +63,7 @@ export interface EditorState {
   updateNodeCondition: (nodeId: string, condition: ComponentNode['condition']) => void
   exportSchema: () => FSPSchema
   importSchema: (schema: FSPSchema) => void
-  setRightPanelTab: (tab: 'props' | 'datasource' | 'code' | 'preview') => void
+  setRightPanelTab: (tab: 'props' | 'datasource' | 'code') => void
   generateCode: () => void
   addDataSource: (ds: Omit<DataSourceDef, 'id'>) => void
   updateDataSource: (id: string, updates: Partial<DataSourceDef>) => void
@@ -67,6 +73,12 @@ export interface EditorState {
   removeFormState: (id: string) => void
   updateNodeEvents: (nodeId: string, eventName: string, actions: Action[]) => void
   removeNodeEvent: (nodeId: string, eventName: string) => void
+
+  // Global data source actions (Area 2)
+  addGlobalDataSource: (ds: Omit<DataSourceDef, 'id'>) => void
+  updateGlobalDataSource: (id: string, updates: Partial<DataSourceDef>) => void
+  removeGlobalDataSource: (id: string) => void
+  togglePageGlobalDataSourceRef: (dataSourceId: string) => void
 
   // History actions (M3)
   undo: () => void
@@ -362,6 +374,65 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
       })
     },
 
+    // Global DataSource actions (Area 2)
+    addGlobalDataSource: (ds) => {
+      set((state) => {
+        const baseName = ds.label || 'dataSource'
+        const camelCaseId = baseName
+          .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+(.)/g, (_, chr) => chr.toUpperCase())
+          .replace(/^[A-Z]/, (chr) => chr.toLowerCase())
+          .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '')
+
+        const finalId = camelCaseId || `ds_${Date.now()}`
+
+        const existingIds = new Set(state.schema.globalDataSources?.map(d => d.id) ?? [])
+        let id = finalId
+        let suffix = 1
+        while (existingIds.has(id)) {
+          id = `${finalId}${suffix}`
+          suffix++
+        }
+
+        addGlobalDataSource(state.schema, { ...ds, id } as DataSourceDef)
+        pushHistory(state)
+      })
+    },
+
+    updateGlobalDataSource: (id, updates) => {
+      set((state) => {
+        const success = updateGlobalDataSource(state.schema, id, updates)
+        if (!success) return
+        pushHistory(state)
+      })
+    },
+
+    removeGlobalDataSource: (id) => {
+      set((state) => {
+        const success = removeGlobalDataSource(state.schema, id)
+        if (!success) return
+        // Also remove references from all pages
+        if (state.schema.pages) {
+          for (const page of state.schema.pages) {
+            if (page.globalDataSourceRefs) {
+              page.globalDataSourceRefs = page.globalDataSourceRefs.filter(refId => refId !== id)
+            }
+          }
+        }
+        pushHistory(state)
+      })
+    },
+
+    togglePageGlobalDataSourceRef: (dsId: string) => {
+      set((state) => {
+        if (!state.currentPageId) return
+        const currentPage = findPageById(state.schema, state.currentPageId)
+        if (!currentPage) return
+
+        togglePageGlobalDataSourceRef(currentPage, dsId)
+        pushHistory(state)
+      })
+    },
+
     updateNodeEvents: (nodeId, eventName, actions) => {
       set((state) => {
         const node = findNodeById(state.schema.componentTree, nodeId)
@@ -597,4 +668,27 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 }
 
 // @ts-ignore - Immer draft types leak into export, but functionality is correct
-export const useEditorStore = create<EditorState>()(immer(storeCreator))
+export const useEditorStore = create<EditorState>()(
+  persist(
+    immer(storeCreator),
+    {
+      name: 'forgestudio-editor',
+      partialize: (state) => ({
+        schema: state.schema,
+        currentPageId: state.currentPageId,
+      } as unknown as EditorState),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<EditorState> | undefined
+        if (!persisted?.schema) return currentState
+        return {
+          ...currentState,
+          schema: persisted.schema,
+          currentPageId: persisted.currentPageId ?? null,
+          // Reset history from restored schema
+          history: [{ schema: structuredClone(persisted.schema), currentPageId: persisted.currentPageId ?? null }],
+          historyIndex: 0,
+        }
+      },
+    }
+  )
+)

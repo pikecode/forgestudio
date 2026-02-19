@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { ComponentNode } from '@forgestudio/protocol'
 import { useEditorStore } from '../store'
@@ -14,6 +14,13 @@ export function EditWrapper({ node, children }: EditWrapperProps) {
   const selectNode = useEditorStore((s) => s.selectNode)
   const isSelected = selectedNodeId === node.id
 
+  // Debug: log when selection changes
+  useEffect(() => {
+    if (isSelected) {
+      console.log('Component selected:', node.id, node.component)
+    }
+  }, [isSelected, node.id, node.component])
+
   // Check if this component can accept children
   const meta = getComponentMeta(node.component)
   const canAcceptChildren = meta?.allowChildren ?? false
@@ -24,6 +31,20 @@ export function EditWrapper({ node, children }: EditWrapperProps) {
     data: { type: 'node', parentId: node.id },
     disabled: !canAcceptChildren,
   })
+
+  // Scroll into view when selected (query DOM by data-node-id)
+  useEffect(() => {
+    if (isSelected) {
+      const element = document.querySelector(`[data-node-id="${node.id}"]`)
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        })
+      }
+    }
+  }, [isSelected, node.id])
 
   return (
     <div

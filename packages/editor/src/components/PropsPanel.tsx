@@ -15,6 +15,7 @@ import {
   TypographySetter,
   BorderSetter,
 } from '../setters'
+import { StatePanel } from './StatePanel'
 
 /** Find the ancestor List node that has a loop binding */
 function findLoopAncestor(tree: import('@forgestudio/protocol').ComponentNode, nodeId: string): import('@forgestudio/protocol').ComponentNode | null {
@@ -26,14 +27,42 @@ function findLoopAncestor(tree: import('@forgestudio/protocol').ComponentNode, n
   return null
 }
 
-/** Extract field names from mock data */
-function getDataSourceFields(schema: import('@forgestudio/protocol').FSPSchema, dataSourceId: string): string[] {
-  const ds = schema.dataSources?.find((d) => d.id === dataSourceId)
-  if (!ds?.mockData) return []
-  const mockDataObj = ds.mockData as { data?: any[] }
-  const firstItem = mockDataObj?.data?.[0]
-  if (!firstItem || typeof firstItem !== 'object') return []
-  return Object.keys(firstItem)
+/** Extract field names from data source (M5: from responseFields or fallback to sampleData) */
+function getDataSourceFields(dataSources: import('@forgestudio/protocol').DataSourceDef[], dataSourceId: string): string[] {
+  const ds = dataSources.find((d) => d.id === dataSourceId)
+  if (!ds) return []
+
+  // Priority 1: Use responseFields if available
+  if (ds.responseFields && ds.responseFields.length > 0) {
+    return ds.responseFields.map(f => f.name)
+  }
+
+  // Priority 2: Extract from sampleData
+  if (ds.sampleData) {
+    // Handle array sampleData (list data sources)
+    if (Array.isArray(ds.sampleData) && ds.sampleData.length > 0) {
+      const firstItem = ds.sampleData[0]
+      if (firstItem && typeof firstItem === 'object') {
+        return Object.keys(firstItem)
+      }
+    }
+    // Handle object sampleData (detail data sources)
+    else if (typeof ds.sampleData === 'object' && !Array.isArray(ds.sampleData)) {
+      return Object.keys(ds.sampleData)
+    }
+  }
+
+  // Priority 3: Backward compatibility - extract from mockData
+  const mockData = (ds as any).mockData
+  if (mockData) {
+    const mockDataObj = mockData as { data?: any[] }
+    const firstItem = mockDataObj?.data?.[0]
+    if (firstItem && typeof firstItem === 'object') {
+      return Object.keys(firstItem)
+    }
+  }
+
+  return []
 }
 
 function SetterFor({
@@ -74,19 +103,30 @@ function SetterFor({
 export function PropsPanel() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
   const schema = useEditorStore((s) => s.schema)
+  const getCurrentPage = useEditorStore((s) => s.getCurrentPage)
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps)
   const updateNodeStyles = useEditorStore((s) => s.updateNodeStyles)
   const updateNodeLoop = useEditorStore((s) => s.updateNodeLoop)
   const updateNodeCondition = useEditorStore((s) => s.updateNodeCondition)
   const updateNodeEvents = useEditorStore((s) => s.updateNodeEvents)
   const addFormState = useEditorStore((s) => s.addFormState)
+  const updateFormState = useEditorStore((s) => s.updateFormState)
+  const removeFormState = useEditorStore((s) => s.removeFormState)
   const removeNode = useEditorStore((s) => s.removeNode)
   const rightPanelTab = useEditorStore((s) => s.rightPanelTab)
   const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab)
 
+  // M4: Get page-level data
+  const currentPage = getCurrentPage()
+  const pageDataSources = currentPage?.dataSources ?? []
+  const pageFormStates = currentPage?.formStates ?? []
+
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm'>('showToast')
   const [actionParams, setActionParams] = useState<Record<string, any>>({})
+  const [showStateManager, setShowStateManager] = useState(false)
+  // Track selected data source for each prop (key: nodeId_propName, value: dsId)
+  const [selectedDataSources, setSelectedDataSources] = useState<Record<string, string>>({})
 
   const handlePropChange = (nodeId: string, component: string, propName: string, value: unknown) => {
     updateNodeProps(nodeId, { [propName]: value })
@@ -180,8 +220,8 @@ export function PropsPanel() {
       {propsSchema.map((def) => {
         // For List's dataSourceId, dynamically build enum options from available data sources
         if (node.component === 'List' && def.name === 'dataSourceId') {
-          const dsOptions = (schema.dataSources ?? []).map((ds) => ({
-            label: ds.id,
+          const dsOptions = pageDataSources.map((ds) => ({
+            label: ds.label || ds.id,
             value: ds.id,
           }))
           if (dsOptions.length === 0) {
@@ -204,7 +244,7 @@ export function PropsPanel() {
 
         // For string props inside a loop, show field picker
         if (def.type === 'string' && loopAncestor) {
-          const fields = getDataSourceFields(schema, loopAncestor.loop!.dataSourceId)
+          const fields = getDataSourceFields(pageDataSources, loopAncestor.loop!.dataSourceId)
           if (fields.length > 0) {
             const fieldOptions = fields.map((f) => ({
               label: `$item.${f}`,
@@ -222,6 +262,43 @@ export function PropsPanel() {
               </div>
             )
           }
+        }
+
+        // For string props NOT in a loop, show data source field picker if available
+        if (def.type === 'string' && !loopAncestor && pageDataSources.length > 0) {
+          const dsFieldOptions: Array<{ dataSourceId: string; fieldName: string; displayName: string; fullPath: string }> = []
+
+          for (const ds of pageDataSources) {
+            const fields = getDataSourceFields(pageDataSources, ds.id)
+            if (fields.length > 0) {
+              for (const field of fields) {
+                dsFieldOptions.push({
+                  dataSourceId: ds.id,
+                  fieldName: field,
+                  displayName: `${ds.label || ds.id}.${field}`,
+                  fullPath: `{{$ds.${ds.id}.${field}}}`
+                })
+              }
+            }
+          }
+
+          // 即使没有字段信息，也应该让用户可以手动输入表达式
+          const currentValue = node.props[def.name] ?? def.default
+          return (
+            <div key={def.name}>
+              <StringSetter
+                key={`${node.id}-${def.name}`}
+                label={def.title}
+                value={currentValue}
+                onChange={(v) => handlePropChange(node.id, node.component, def.name, v)}
+                enableExpressionMode
+                expressionContext={{
+                  stateVars: pageFormStates.map(fs => ({ id: fs.id, type: fs.type })),
+                  dataSourceFields: dsFieldOptions,
+                }}
+              />
+            </div>
+          )
         }
 
         return (
@@ -279,10 +356,10 @@ export function PropsPanel() {
             label="内边距"
             type="padding"
             value={{
-              top: node.styles.paddingTop,
-              right: node.styles.paddingRight,
-              bottom: node.styles.paddingBottom,
-              left: node.styles.paddingLeft,
+              top: node.styles.paddingTop as string | number | undefined,
+              right: node.styles.paddingRight as string | number | undefined,
+              bottom: node.styles.paddingBottom as string | number | undefined,
+              left: node.styles.paddingLeft as string | number | undefined,
             }}
             onChange={(value) => {
               updateNodeStyles(node.id, {
@@ -298,10 +375,10 @@ export function PropsPanel() {
             label="外边距"
             type="margin"
             value={{
-              top: node.styles.marginTop,
-              right: node.styles.marginRight,
-              bottom: node.styles.marginBottom,
-              left: node.styles.marginLeft,
+              top: node.styles.marginTop as string | number | undefined,
+              right: node.styles.marginRight as string | number | undefined,
+              bottom: node.styles.marginBottom as string | number | undefined,
+              left: node.styles.marginLeft as string | number | undefined,
             }}
             onChange={(value) => {
               updateNodeStyles(node.id, {
@@ -320,11 +397,11 @@ export function PropsPanel() {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>布局</div>
             <LayoutSetter
               value={{
-                display: node.styles.display,
-                flexDirection: node.styles.flexDirection,
-                justifyContent: node.styles.justifyContent,
-                alignItems: node.styles.alignItems,
-                gap: node.styles.gap,
+                display: node.styles.display as string | undefined,
+                flexDirection: node.styles.flexDirection as string | undefined,
+                justifyContent: node.styles.justifyContent as string | undefined,
+                alignItems: node.styles.alignItems as string | undefined,
+                gap: node.styles.gap as string | number | undefined,
               }}
               onChange={(value) => {
                 updateNodeStyles(node.id, value)
@@ -338,10 +415,10 @@ export function PropsPanel() {
           <div style={{ fontSize: 12, fontWeight: 600, color: '#333', marginBottom: 8 }}>文字</div>
           <TypographySetter
             value={{
-              fontSize: node.styles.fontSize,
-              fontWeight: node.styles.fontWeight,
-              lineHeight: node.styles.lineHeight,
-              textAlign: node.styles.textAlign,
+              fontSize: node.styles.fontSize as string | number | undefined,
+              fontWeight: node.styles.fontWeight as string | undefined,
+              lineHeight: node.styles.lineHeight as string | number | undefined,
+              textAlign: node.styles.textAlign as string | undefined,
             }}
             onChange={(value) => {
               updateNodeStyles(node.id, value)
@@ -400,9 +477,9 @@ export function PropsPanel() {
           </div>
           <BorderSetter
             value={{
-              borderWidth: node.styles.borderWidth,
-              borderColor: node.styles.borderColor,
-              borderRadius: node.styles.borderRadius,
+              borderWidth: node.styles.borderWidth as string | number | undefined,
+              borderColor: node.styles.borderColor as string | undefined,
+              borderRadius: node.styles.borderRadius as string | number | undefined,
             }}
             onChange={(value) => {
               updateNodeStyles(node.id, value)
@@ -411,8 +488,8 @@ export function PropsPanel() {
         </div>
       </div>
 
-      {/* Input Binding Section - simplified UI for Input onChange */}
-      {node.component === 'Input' && (
+      {/* Data Binding Section - simplified UI for Input/Textarea/Switch onChange */}
+      {(node.component === 'Input' || node.component === 'Textarea' || node.component === 'Switch') && (
         <>
           <div className="forge-editor-panel__section">数据绑定</div>
           <div style={{ padding: '8px 12px' }}>
@@ -421,7 +498,7 @@ export function PropsPanel() {
             </label>
             <input
               type="text"
-              placeholder="例如: inputValue"
+              placeholder={node.component === 'Switch' ? '例如: isChecked' : '例如: inputValue'}
               value={
                 node.events?.onChange?.[0]?.type === 'setState'
                   ? node.events.onChange[0].target
@@ -438,21 +515,28 @@ export function PropsPanel() {
                   }
                   updateNodeEvents(node.id, 'onChange', [action])
 
+                  // Determine type and defaultValue based on component
+                  const isSwitch = node.component === 'Switch'
+                  const stateType = isSwitch ? 'boolean' : 'string'
+                  const defaultValue = isSwitch ? false : ''
+                  const bindProp = isSwitch ? 'checked' : 'value'
+
                   // Ensure formState exists
-                  const existingState = schema.formStates?.find(fs => fs.id === varName)
+                  const existingState = pageFormStates.find(fs => fs.id === varName)
                   if (!existingState) {
                     addFormState(varName, {
-                      type: 'string',
-                      defaultValue: ''
+                      type: stateType,
+                      defaultValue
                     })
                   }
 
-                  // Bind Input value to state
-                  updateNodeProps(node.id, { value: `{{${varName}}}` })
+                  // Bind component prop to state
+                  updateNodeProps(node.id, { [bindProp]: `{{${varName}}}` })
                 } else {
                   // Clear binding
                   updateNodeEvents(node.id, 'onChange', [])
-                  updateNodeProps(node.id, { value: '' })
+                  const bindProp = node.component === 'Switch' ? 'checked' : 'value'
+                  updateNodeProps(node.id, { [bindProp]: node.component === 'Switch' ? false : '' })
                 }
               }}
               style={{
@@ -470,19 +554,42 @@ export function PropsPanel() {
         </>
       )}
 
-      {/* State Management Section - show available states for setState actions */}
-      {schema.formStates && schema.formStates.length > 0 && (
-        <>
-          <div className="forge-editor-panel__section">可用状态变量</div>
+      {/* State Management Section - show available states and management */}
+      <>
+        <div className="forge-editor-panel__section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>可用状态变量</span>
+          <button
+            className="forge-editor-btn forge-editor-btn--small"
+            onClick={() => setShowStateManager(!showStateManager)}
+            style={{ fontSize: 11 }}
+          >
+            {showStateManager ? '收起管理' : '管理'}
+          </button>
+        </div>
+        {!showStateManager && (
           <div style={{ padding: '8px 12px' }}>
-            {schema.formStates.map((fs) => (
-              <div key={fs.id} style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
-                • {fs.id} ({fs.type})
-              </div>
-            ))}
+            {pageFormStates.length > 0 ? (
+              pageFormStates.map((fs) => (
+                <div key={fs.id} style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                  • {fs.id} ({fs.type})
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: '#999' }}>暂无状态变量</div>
+            )}
           </div>
-        </>
-      )}
+        )}
+        {showStateManager && (
+          <div style={{ padding: '8px 12px' }}>
+            <StatePanel
+              schema={{ ...schema, formStates: pageFormStates }}
+              addFormState={addFormState}
+              updateFormState={updateFormState}
+              removeFormState={removeFormState}
+            />
+          </div>
+        )}
+      </>
 
       {/* Conditional Rendering Section (M1.5) */}
       {node.component !== 'Page' && (
@@ -504,9 +611,17 @@ export function PropsPanel() {
                 }
               }}
               context={{
-                stateVars: schema.formStates?.map(fs => ({ id: fs.id, type: fs.type })) || [],
-                itemFields: loopAncestor ? getDataSourceFields(schema, loopAncestor.loop!.dataSourceId) : [],
-                dataSourceFields: schema.dataSources?.map(ds => ({ name: ds.id, dsId: ds.id })) || []
+                stateVars: pageFormStates.map(fs => ({ id: fs.id, type: fs.type })),
+                itemFields: loopAncestor ? getDataSourceFields(pageDataSources, loopAncestor.loop!.dataSourceId) : [],
+                dataSourceFields: pageDataSources.flatMap(ds => {
+                  const fields = getDataSourceFields(pageDataSources, ds.id)
+                  return fields.map(field => ({
+                    dataSourceId: ds.id,
+                    fieldName: field,
+                    displayName: `${ds.label || ds.id}.${field}`,
+                    fullPath: `$ds.${ds.id}.${field}`
+                  }))
+                })
               }}
             />
             <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
@@ -537,7 +652,7 @@ export function PropsPanel() {
                 {actions.map((action, idx) => (
                   <div key={idx} style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>
-                      • {action.type === 'navigate' && `跳转: ${action.url}`}
+                      • {action.type === 'navigate' && `跳转: ${action.url}${action.params ? ` (参数: ${Object.keys(action.params).join(', ')})` : ''}`}
                       {action.type === 'showToast' && `提示: ${action.title}`}
                       {action.type === 'setState' && `设置状态: ${action.target} = ${action.value}`}
                       {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields.length}个字段)`}
@@ -628,18 +743,80 @@ export function PropsPanel() {
                     )}
 
                     {actionType === 'navigate' && (
-                      <div style={{ marginBottom: 6 }}>
-                        <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
-                          目标页面
-                        </label>
-                        <input
-                          type="text"
-                          value={actionParams.url || ''}
-                          onChange={(e) => setActionParams({ ...actionParams, url: e.target.value })}
-                          placeholder="/pages/detail/index"
-                          style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
-                        />
-                      </div>
+                      <>
+                        <div style={{ marginBottom: 6 }}>
+                          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                            目标页面
+                          </label>
+                          {schema.pages && schema.pages.length > 0 ? (
+                            <select
+                              value={actionParams.url || ''}
+                              onChange={(e) => setActionParams({ ...actionParams, url: e.target.value })}
+                              style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                            >
+                              <option value="">-- 选择页面 --</option>
+                              {schema.pages.map((page) => (
+                                <option key={page.id} value={page.path}>
+                                  {page.title} ({page.path})
+                                </option>
+                              ))}
+                              <option value="__custom__">手动输入...</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={actionParams.url || ''}
+                              onChange={(e) => setActionParams({ ...actionParams, url: e.target.value })}
+                              placeholder="/pages/detail/index"
+                              style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                            />
+                          )}
+                        </div>
+                        {actionParams.url === '__custom__' && (
+                          <div style={{ marginBottom: 6 }}>
+                            <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                              自定义路径
+                            </label>
+                            <input
+                              type="text"
+                              value={actionParams.customUrl || ''}
+                              onChange={(e) => setActionParams({ ...actionParams, customUrl: e.target.value })}
+                              placeholder="/pages/detail/index"
+                              style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                            />
+                          </div>
+                        )}
+                        <div style={{ marginTop: 8, padding: 8, border: '1px dashed #d0d0d0', borderRadius: 4, backgroundColor: '#fafafa' }}>
+                          <div style={{ fontSize: 12, color: '#555', fontWeight: 500, marginBottom: 6 }}>
+                            传递参数 (可选)
+                          </div>
+                          <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
+                            传递给目标页面的参数，如 id。支持表达式如 {'{{$item.id}}'}
+                          </div>
+                          <div style={{ marginBottom: 4 }}>
+                            <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>参数名</label>
+                            <input
+                              type="text"
+                              value={actionParams.paramKey || ''}
+                              onChange={(e) => setActionParams({ ...actionParams, paramKey: e.target.value })}
+                              placeholder="id"
+                              style={{ width: '100%', padding: '3px 6px', fontSize: 11, border: '1px solid #d0d0d0', borderRadius: 3 }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11, color: '#666', display: 'block', marginBottom: 2 }}>
+                              参数值 (支持表达式)
+                            </label>
+                            <input
+                              type="text"
+                              value={actionParams.paramValue || ''}
+                              onChange={(e) => setActionParams({ ...actionParams, paramValue: e.target.value })}
+                              placeholder="{{$item.id}}"
+                              style={{ width: '100%', padding: '3px 6px', fontSize: 11, border: '1px solid #d0d0d0', borderRadius: 3 }}
+                            />
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     {actionType === 'setState' && (
@@ -648,14 +825,14 @@ export function PropsPanel() {
                           <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
                             状态变量
                           </label>
-                          {schema.formStates && schema.formStates.length > 0 ? (
+                          {pageFormStates.length > 0 ? (
                             <select
                               value={actionParams.target || ''}
                               onChange={(e) => setActionParams({ ...actionParams, target: e.target.value })}
                               style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
                             >
                               <option value="">-- 选择状态变量 --</option>
-                              {schema.formStates.map((fs) => (
+                              {pageFormStates.map((fs) => (
                                 <option key={fs.id} value={fs.id}>{fs.id} ({fs.type})</option>
                               ))}
                             </select>
@@ -720,9 +897,9 @@ export function PropsPanel() {
                           <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
                             提交字段（多选）
                           </label>
-                          {schema.formStates && schema.formStates.length > 0 ? (
+                          {pageFormStates.length > 0 ? (
                             <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid #d0d0d0', borderRadius: 4, padding: 4 }}>
-                              {schema.formStates.map((fs) => (
+                              {pageFormStates.map((fs) => (
                                 <label
                                   key={fs.id}
                                   style={{
@@ -788,7 +965,13 @@ export function PropsPanel() {
                         className="forge-editor-btn forge-editor-btn--small forge-editor-btn--primary"
                         onClick={() => {
                           const newAction: Action = actionType === 'navigate'
-                            ? { type: 'navigate', url: actionParams.url || '' }
+                            ? {
+                                type: 'navigate',
+                                url: actionParams.url === '__custom__' ? (actionParams.customUrl || '') : (actionParams.url || ''),
+                                params: actionParams.paramKey && actionParams.paramValue
+                                  ? { [actionParams.paramKey]: actionParams.paramValue }
+                                  : undefined
+                              }
                             : actionType === 'showToast'
                             ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as any }
                             : actionType === 'setState'

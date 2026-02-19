@@ -2,6 +2,18 @@ import { useEffect } from 'react'
 import { useEditorStore } from '../store'
 import { findNodeById } from '@forgestudio/protocol'
 
+function showSaveToast() {
+  const existing = document.querySelector('.forge-save-toast')
+  if (existing) existing.remove()
+  const toast = document.createElement('div')
+  toast.className = 'forge-save-toast'
+  toast.textContent = '已自动保存'
+  toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;z-index:10000;transition:opacity .3s'
+  document.body.appendChild(toast)
+  setTimeout(() => { toast.style.opacity = '0' }, 1200)
+  setTimeout(() => toast.remove(), 1600)
+}
+
 export function useKeyboardShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,8 +71,8 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      // Ctrl+S - Export (save)
-      if (ctrlKey && e.key === 's') {
+      // Ctrl+Shift+S - Export file
+      if (ctrlKey && e.key === 's' && e.shiftKey) {
         e.preventDefault()
         const schema = state.exportSchema()
         const json = JSON.stringify(schema, null, 2)
@@ -71,6 +83,13 @@ export function useKeyboardShortcuts() {
         a.download = `${schema.meta.name || 'page'}.fsp.json`
         a.click()
         URL.revokeObjectURL(url)
+        return
+      }
+
+      // Ctrl+S - Show auto-save toast (data is persisted automatically)
+      if (ctrlKey && e.key === 's') {
+        e.preventDefault()
+        showSaveToast()
         return
       }
     }

@@ -7,10 +7,14 @@ export interface FSPSchema {
   version: string
   meta: FSPMeta
   componentTree: ComponentNode  // Deprecated: use pages instead (kept for backward compatibility)
+  /** @deprecated Use page-level dataSources instead (M4). Global dataSources will be auto-migrated to first page. */
   dataSources?: DataSourceDef[]
+  /** @deprecated Use page-level formStates instead (M4). Global formStates will be auto-migrated to first page. */
   formStates?: FormStateDef[]
   /** Multi-page support (M3) */
   pages?: PageDef[]
+  /** Global data sources shared across all pages (Area 2) */
+  globalDataSources?: DataSourceDef[]
 }
 
 export interface FSPMeta {
@@ -25,6 +29,22 @@ export interface PageDef {
   title: string  // Display name
   path: string  // Route path, e.g. '/pages/index/index'
   componentTree: ComponentNode
+  /** Page-level data sources (M4) */
+  dataSources?: DataSourceDef[]
+  /** Page-level form states (M4) */
+  formStates?: FormStateDef[]
+  /** Page parameters that can be passed via navigation (M4) */
+  params?: PageParamDef[]
+  /** References to global data sources (Area 2) */
+  globalDataSourceRefs?: string[]
+}
+
+/** Page parameter definition (M4) */
+export interface PageParamDef {
+  name: string        // Parameter name, e.g. "id"
+  type: 'string' | 'number'
+  required: boolean
+  description?: string  // For UI hints
 }
 
 /** Form state definition for Input bindings (M1.4) */
@@ -57,17 +77,37 @@ export interface ComponentNode {
   }
 }
 
-/** Data source definition (M1.3, declared here for forward compat) */
+/** Field schema extracted from API response */
+export interface FieldSchema {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array'
+}
+
+/** Data source definition (M1.3, M5: real API-driven) */
 export interface DataSourceDef {
   id: string
   type: 'api'
+  /** Purpose: query (fetch data) vs mutation (create/update/delete) */
+  purpose: 'query' | 'mutation'
+  /** Data type: 'array' for list APIs, 'object' for detail APIs (default: 'array') */
+  dataType?: 'array' | 'object'
+  /** Display label, e.g. "Get Product List" */
+  label?: string
   options: {
     url: string
-    method: 'GET' | 'POST'
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE'
     headers?: Record<string, string>
+    /** Request body template for mutations (JSON string) */
+    body?: string
   }
+  /** Auto-fetch on page load (default true for query, false for mutation) */
   autoFetch: boolean
+  /** @deprecated Use sampleData instead. Kept for backward compatibility */
   mockData?: unknown
+  /** Sample data cached from real API (for editor preview only, max 3 items) */
+  sampleData?: unknown[]
+  /** Fields extracted from API response */
+  responseFields?: FieldSchema[]
   /** Dependencies: data sources that must be fetched before this one (M2) */
   dependsOn?: string[]
 }
@@ -82,6 +122,7 @@ export type Action =
 export interface NavigateAction {
   type: 'navigate'
   url: string  // e.g. '/pages/detail/index'
+  params?: Record<string, string>  // URL parameters, e.g. {id: '{{$item.id}}'}
 }
 
 export interface ShowToastAction {

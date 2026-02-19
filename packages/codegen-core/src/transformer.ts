@@ -1,4 +1,5 @@
 import type { ComponentNode, FSPSchema, Action, DataSourceDef, PageDef } from '@forgestudio/protocol'
+import { getEffectiveDataSources } from '@forgestudio/protocol'
 import type {
   IRProject,
   IRPage,
@@ -39,6 +40,35 @@ export function transformFSPtoIR(schema: FSPSchema): IRProject {
     pages,
     appName: schema.meta.name || 'ForgeStudio App',
   }
+}
+
+/**
+ * Sanitize ID to valid JavaScript variable name
+ * Removes non-alphanumeric characters and ensures valid identifier
+ * Uses stable hash for non-ASCII characters to ensure consistency
+ */
+function sanitizeVarName(id: string): string {
+  // Remove non-alphanumeric characters (except underscore)
+  let sanitized = id.replace(/[^\w]/g, '_')
+
+  // Ensure doesn't start with number
+  if (/^\d/.test(sanitized)) {
+    sanitized = '_' + sanitized
+  }
+
+  // If empty or only underscores, use stable hash of original ID
+  if (!sanitized || /^_+$/.test(sanitized)) {
+    // Simple hash function for consistent results
+    let hash = 0
+    for (let i = 0; i < id.length; i++) {
+      const char = id.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    sanitized = 'ds_' + Math.abs(hash).toString(36)
+  }
+
+  return sanitized
 }
 
 /**
@@ -83,6 +113,38 @@ function sortDataSourcesByDependency(dataSources: DataSourceDef[]): DataSourceDe
 }
 
 /**
+ * Collect all data source IDs referenced in a component tree
+ */
+function collectReferencedDataSources(node: ComponentNode): Set<string> {
+  const refs = new Set<string>()
+
+  // Check loop binding
+  if (node.loop?.dataSourceId) {
+    refs.add(node.loop.dataSourceId)
+  }
+
+  // Check props for $ds.xxx references
+  for (const [key, value] of Object.entries(node.props)) {
+    if (typeof value === 'string') {
+      // Match {{$ds.xxx.data}} or similar patterns
+      // Use [^.\s}]+ to match any characters including Chinese
+      const matches = value.matchAll(/\{\{\$ds\.([^.\s}]+)\./g)
+      for (const match of matches) {
+        refs.add(match[1])
+      }
+    }
+  }
+
+  // Recurse children
+  for (const child of node.children ?? []) {
+    const childRefs = collectReferencedDataSources(child)
+    childRefs.forEach(ref => refs.add(ref))
+  }
+
+  return refs
+}
+
+/**
  * Transform a single page definition to IR
  */
 function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
@@ -92,18 +154,26 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
   const handlers: IRHandler[] = []
   let handlerCounter = 0
 
-  // Sort data sources by dependency (M2)
-  const sortedDataSources = sortDataSourcesByDependency(schema.dataSources ?? [])
+  // Collect referenced data sources for this page
+  const referencedDataSourceIds = collectReferencedDataSources(pageDef.componentTree)
+
+  // M4: Use page-level dataSources + global data sources (Area 2)
+  const pageDataSources = getEffectiveDataSources(schema, pageDef.id)
+
+  // Sort data sources by dependency (M2) and filter to only referenced ones
+  const sortedDataSources = sortDataSourcesByDependency(pageDataSources)
+    .filter(ds => referencedDataSourceIds.has(ds.id))
 
   // Generate state vars and effects from data sources
   for (const ds of sortedDataSources) {
-    const varName = `${ds.id}Data`
-    const raw = ds.mockData as any
-    const mockData = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
+    const varName = `${sanitizeVarName(ds.id)}Data`
+    const sampleData = ds.sampleData ?? []
+    const isObjectType = ds.dataType === 'object'
+
     stateVars.push({
       name: varName,
-      type: 'any[]',
-      defaultValue: mockData,
+      type: isObjectType ? 'any' : 'any[]',
+      defaultValue: isObjectType ? (Array.isArray(sampleData) ? sampleData[0] : sampleData) : sampleData,
     })
 
     if (ds.autoFetch) {
@@ -112,19 +182,50 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
       // Build dependency wait logic if needed
       let dependencyCheck = ''
       if (ds.dependsOn && ds.dependsOn.length > 0) {
-        const depChecks = ds.dependsOn.map(depId => `${depId}Data.length > 0`).join(' && ')
+        const depChecks = ds.dependsOn.map(depId => {
+          const depDs = sortedDataSources.find(d => d.id === depId)
+          if (depDs?.dataType === 'object') {
+            return `${sanitizeVarName(depId)}Data`
+          } else {
+            return `${sanitizeVarName(depId)}Data.length > 0`
+          }
+        }).join(' && ')
         dependencyCheck = `if (!(${depChecks})) return\n    `
+      }
+
+      // Transform URL templates with $param
+      let urlExpr = ds.options.url
+      let paramsDecl = ''
+      if (urlExpr.includes('{{$param.')) {
+        // Convert {{$param.xxx}} to ${params.xxx}
+        urlExpr = urlExpr.replace(/\{\{\$param\.(\w+)\}\}/g, '${params.$1}')
+        urlExpr = `\`${urlExpr}\``
+        paramsDecl = `const params = Taro.getCurrentInstance().router?.params || {}\n    `
+      } else {
+        urlExpr = `'${urlExpr}'`
+      }
+
+      // Generate different logic for object vs array
+      let fetchBody: string
+      if (isObjectType) {
+        // Object type: directly set response data
+        fetchBody = `${dependencyCheck}${paramsDecl}Taro.request({ url: ${urlExpr}, method: '${ds.options.method}' })\n      .then(res => {\n        if (res.data) set${capitalizedName}(res.data)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n      })`
+      } else {
+        // Array type: use extractList helper
+        fetchBody = `${dependencyCheck}${paramsDecl}Taro.request({ url: ${urlExpr}, method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n      })`
       }
 
       effects.push({
         trigger: 'mount',
-        body: `${dependencyCheck}Taro.request({ url: '${ds.options.url}', method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n      })`,
+        body: fetchBody,
       })
     }
   }
 
   // Generate state vars from form states
-  for (const fs of schema.formStates ?? []) {
+  // M4: Use page-level formStates with fallback to global for backward compatibility
+  const pageFormStates = pageDef.formStates ?? schema.formStates ?? []
+  for (const fs of pageFormStates) {
     stateVars.push({
       name: fs.id,
       type: fs.type === 'number' ? 'number' : fs.type === 'boolean' ? 'boolean' : 'string',
@@ -136,12 +237,46 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
   function generateHandlerBody(actions: Action[]): string {
     const statements = actions.map(action => {
       switch (action.type) {
-        case 'navigate':
-          return `Taro.navigateTo({ url: '${action.url}' })`
+        case 'navigate': {
+          // Build query string from params
+          if (action.params && Object.keys(action.params).length > 0) {
+            const paramPairs = Object.entries(action.params)
+              .map(([key, value]) => {
+                // Transform {{$item.xxx}} -> ${item.xxx}
+                let expr = String(value)
+                if (expr.startsWith('{{') && expr.endsWith('}}')) {
+                  expr = expr.slice(2, -2).trim()
+                    .replace(/^\$item\./, 'item.')
+                    .replace(/^\$state\./, '')
+                  // Use ${} syntax for template string interpolation
+                  return `${key}=\${${expr}}`
+                } else {
+                  // Static value
+                  return `${key}=${expr}`
+                }
+              })
+              .join('&')
+            return `Taro.navigateTo({ url: \`${action.url}?${paramPairs}\` })`
+          } else {
+            return `Taro.navigateTo({ url: '${action.url}' })`
+          }
+        }
         case 'showToast':
           return `Taro.showToast({ title: '${action.title}', icon: '${action.icon || 'success'}' })`
-        case 'setState':
-          return `set${action.target.charAt(0).toUpperCase() + action.target.slice(1)}(${action.value})`
+        case 'setState': {
+          // Find target variable type for type conversion
+          const targetState = pageFormStates.find(fs => fs.id === action.target)
+          let valueExpr = action.value
+
+          // Add type conversion if needed
+          if (targetState?.type === 'number' && !valueExpr.includes('Number(')) {
+            valueExpr = `Number(${valueExpr})`
+          } else if (targetState?.type === 'boolean' && !valueExpr.includes('Boolean(')) {
+            valueExpr = `Boolean(${valueExpr})`
+          }
+
+          return `set${action.target.charAt(0).toUpperCase() + action.target.slice(1)}(${valueExpr})`
+        }
         case 'submitForm':
           const dataObj = action.fields.map(f => `      ${f}`).join(',\n')
           return `e.preventDefault()
@@ -174,6 +309,27 @@ ${dataObj}
     )
   }
 
+  // Check if handler references $item (loop item variable)
+  function needsItemParam(actions: Action[]): boolean {
+    return actions.some(action => {
+      if (action.type === 'navigate' && action.params) {
+        return Object.values(action.params).some(v => String(v).includes('$item'))
+      }
+      return false
+    })
+  }
+
+  // Sanitize expressions: replace data source IDs with sanitized versions
+  // e.g., {{$ds.详情接口.id}} -> {{$ds.___.id}}
+  function sanitizeExpression(expr: string): string {
+    if (!expr.includes('$ds.')) return expr
+
+    // Match $ds.xxx.yyy pattern and replace xxx with sanitized version
+    return expr.replace(/\$ds\.([^.}]+)/g, (match, dsId) => {
+      return `$ds.${sanitizeVarName(dsId)}`
+    })
+  }
+
   function transformNode(node: ComponentNode): IRRenderNode | null {
     // Collect styles into stylesheet
     const properties: Record<string, string> = {}
@@ -190,12 +346,14 @@ ${dataObj}
     // Build children
     const children: (IRRenderNode | IRTextContent)[] = []
 
-    // Text content from props (expressions are preserved as-is for codegen)
+    // Text content from props (expressions are sanitized for data source IDs)
     if (node.component === 'Text' && node.props.content) {
-      children.push({ type: 'text', value: String(node.props.content) })
+      const content = String(node.props.content)
+      children.push({ type: 'text', value: sanitizeExpression(content) })
     }
     if (node.component === 'Button' && node.props.text) {
-      children.push({ type: 'text', value: String(node.props.text) })
+      const text = String(node.props.text)
+      children.push({ type: 'text', value: sanitizeExpression(text) })
     }
 
     // Recurse children
@@ -209,7 +367,9 @@ ${dataObj}
     for (const [key, val] of Object.entries(node.props)) {
       if (node.component === 'Text' && key === 'content') continue
       if (node.component === 'Button' && key === 'text') continue
-      irProps[key] = { type: 'literal', value: val }
+      // Sanitize expressions in prop values
+      const sanitizedVal = typeof val === 'string' ? sanitizeExpression(val) : val
+      irProps[key] = { type: 'literal', value: sanitizedVal }
     }
 
     // Handle events - generate handlers and add to props
@@ -220,15 +380,27 @@ ${dataObj}
           const handlerName = `handle${eventName.charAt(0).toUpperCase() + eventName.slice(1)}${handlerCounter}`
           const handlerBody = generateHandlerBody(actions)
           const needsEvent = needsEventParam(actions)
+          const needsItem = needsItemParam(actions)
+
+          // Determine params: prioritize event param, then item param
+          let params = needsEvent ? 'e' : needsItem ? 'item' : undefined
+          if (needsEvent && needsItem) {
+            params = 'item, e'  // Both needed (rare case)
+          }
 
           handlers.push({
             name: handlerName,
-            params: needsEvent ? 'e' : undefined,
+            params,
             body: handlerBody,
           })
 
           // Add handler reference to props
-          irProps[eventName] = { type: 'identifier', name: handlerName }
+          // Mark if needs item wrapping in TSX generation
+          irProps[eventName] = {
+            type: 'identifier',
+            name: handlerName,
+            ...(needsItem && { needsItemWrapper: true })
+          }
         }
       }
     }
@@ -239,7 +411,7 @@ ${dataObj}
     // Handle loop
     let loopInfo: IRRenderNode['loop'] = undefined
     if (node.loop) {
-      const dataVar = `${node.loop.dataSourceId}Data`
+      const dataVar = `${sanitizeVarName(node.loop.dataSourceId)}Data`
       const itemVar = node.loop.itemName || 'item'
       loopInfo = { dataVar, itemVar }
     }
