@@ -477,10 +477,10 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         for (const page of importedSchema.pages) {
           if (page.dataSources) {
             for (const ds of page.dataSources) {
-              const legacyDs = ds as any
-              if (legacyDs.mockData && !ds.sampleData) {
-                ds.sampleData = legacyDs.mockData
-                delete legacyDs.mockData
+              if (ds.mockData && !ds.sampleData) {
+                // Backward compatibility: convert mockData to sampleData
+                ds.sampleData = Array.isArray(ds.mockData) ? ds.mockData : [ds.mockData]
+                delete ds.mockData
               }
               // Set default purpose if missing
               if (!ds.purpose) {

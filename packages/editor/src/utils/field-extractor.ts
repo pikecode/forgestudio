@@ -16,7 +16,7 @@ export function extractListFromResponse(data: unknown): any[] {
     const arrayFields = ['data', 'list', 'items', 'results', 'records']
 
     for (const field of arrayFields) {
-      const value = (data as any)[field]
+      const value = (data as Record<string, any>)[field]
       if (Array.isArray(value)) {
         return value
       }

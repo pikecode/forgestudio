@@ -233,7 +233,7 @@ export function ExpressionSetter({ label, value, onChange, context }: Expression
             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>绑定类型</div>
             <select
               value={varType}
-              onChange={(e) => { setVarType(e.target.value as any); setSelectedVar('') }}
+              onChange={(e) => { setVarType(e.target.value as 'state' | 'item' | 'ds' | 'literal'); setSelectedVar('') }}
               style={selectStyle}
             >
               <option value="literal">字面值</option>

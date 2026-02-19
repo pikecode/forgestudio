@@ -36,8 +36,8 @@ export function DataSourcePanel() {
     body: '',
     autoFetch: true,
     dependsOn: [] as string[],
-    responseFields: [] as any[],
-    sampleData: [] as any[],
+    responseFields: [] as import('@forgestudio/protocol').FieldSchema[],
+    sampleData: [] as unknown[],
   })
 
   // M4: Use page-level dataSources instead of global
@@ -259,7 +259,7 @@ export function DataSourcePanel() {
           const toImport = imported.filter(ds => !existingIds.has(ds.id))
           toImport.forEach(ds => {
             // Backward compatibility: mockData -> sampleData
-            const sampleData = (ds as any).mockData || ds.sampleData
+            const sampleData = ds.mockData || ds.sampleData
             addDataSource({
               type: ds.type,
               purpose: ds.purpose || 'query',
@@ -819,7 +819,7 @@ export function DataSourcePanel() {
             </label>
             <select
               value={formData.method}
-              onChange={(e) => setFormData({ ...formData, method: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, method: e.target.value as 'GET' | 'POST' | 'PUT' | 'DELETE' })}
               style={{
                 width: '100%',
                 padding: '4px 8px',

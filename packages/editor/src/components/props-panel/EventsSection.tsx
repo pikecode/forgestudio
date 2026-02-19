@@ -33,7 +33,7 @@ export function EventsSection() {
             : undefined,
         }
       : actionType === 'showToast'
-      ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as any }
+      ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as 'success' | 'error' | 'loading' | 'none' | undefined }
       : actionType === 'setState'
       ? { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
       : {

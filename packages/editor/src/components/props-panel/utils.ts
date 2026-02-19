@@ -31,7 +31,7 @@ export function getDataSourceFields(dataSources: DataSourceDef[], dataSourceId: 
     }
   }
 
-  const mockData = (ds as any).mockData
+  const mockData = ds.mockData
   if (mockData) {
     const mockDataObj = mockData as { data?: any[] }
     const firstItem = mockDataObj?.data?.[0]

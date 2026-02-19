@@ -53,7 +53,7 @@ function getDataSourceFields(dataSources: import('@forgestudio/protocol').DataSo
   }
 
   // Priority 3: Backward compatibility - extract from mockData
-  const mockData = (ds as any).mockData
+  const mockData = ds.mockData
   if (mockData) {
     const mockDataObj = mockData as { data?: any[] }
     const firstItem = mockDataObj?.data?.[0]
@@ -686,7 +686,7 @@ export function PropsPanel() {
                       <select
                         value={actionType}
                         onChange={(e) => {
-                          setActionType(e.target.value as any)
+                          setActionType(e.target.value as 'navigate' | 'showToast' | 'setState' | 'submitForm')
                           setActionParams({})
                         }}
                         style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
@@ -961,7 +961,7 @@ export function PropsPanel() {
                                   : undefined
                               }
                             : actionType === 'showToast'
-                            ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as any }
+                            ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as 'success' | 'error' | 'loading' | 'none' | undefined }
                             : actionType === 'setState'
                             ? { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
                             : {
