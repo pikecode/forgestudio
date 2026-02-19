@@ -8,6 +8,8 @@ import {
   createEmptySchema,
   createNode,
   findNodeById,
+  migrateSchema,
+  needsMigration,
   findParentNode,
   removeNode as removeNodeFromTree,
   moveNode as moveNodeInTree,
@@ -500,19 +502,18 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
     exportSchema: () => get().schema,
 
     importSchema: (schema) => {
-      const pageId = schema.pages?.[0]?.id ?? null
-      const importedSchema = structuredClone(schema)
+      // Apply migrations if needed
+      const CURRENT_VERSION = '1.1.0'
+      let importedSchema = structuredClone(schema)
 
-      // Migrate legacy global dataSources/formStates to first page (M4)
-      if (importedSchema.pages && importedSchema.pages.length > 0) {
-        if (importedSchema.dataSources && importedSchema.dataSources.length > 0) {
-          importedSchema.pages[0].dataSources = importedSchema.dataSources
-          delete importedSchema.dataSources
-        }
-        if (importedSchema.formStates && importedSchema.formStates.length > 0) {
-          importedSchema.pages[0].formStates = importedSchema.formStates
-          delete importedSchema.formStates
-        }
+      if (needsMigration(importedSchema, CURRENT_VERSION)) {
+        console.log(`Migrating schema from ${importedSchema.version || '1.0.0'} to ${CURRENT_VERSION}`)
+        importedSchema = migrateSchema(importedSchema, CURRENT_VERSION)
+      }
+
+      // Ensure version is set
+      if (!importedSchema.version) {
+        importedSchema.version = CURRENT_VERSION
       }
 
       // Migrate mockData → sampleData (M5 backward compatibility)
@@ -534,9 +535,11 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         }
       }
 
+      const pageId = importedSchema.pages?.[0]?.id ?? null
+
       // Load first page's componentTree into schema.componentTree
-      if (pageId && schema.pages?.[0]) {
-        importedSchema.componentTree = structuredClone(schema.pages[0].componentTree)
+      if (pageId && importedSchema.pages?.[0]) {
+        importedSchema.componentTree = structuredClone(importedSchema.pages[0].componentTree)
       }
 
       set({
