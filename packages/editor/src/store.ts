@@ -160,14 +160,17 @@ function pushHistoryDebounced(state: EditorState): void {
   }, HISTORY_DEBOUNCE_MS)
 }
 
-// Helper function to sync componentTree changes back to pages array
-function syncCurrentPageTree(state: EditorState): void {
-  if (state.currentPageId && state.schema.pages) {
-    const currentPage = state.schema.pages.find(p => p.id === state.currentPageId)
-    if (currentPage) {
-      currentPage.componentTree = state.schema.componentTree
-    }
-  }
+// Get the current page's componentTree (source of truth)
+function getEditingTree(state: EditorState): ComponentNode | null {
+  if (!state.currentPageId || !state.schema.pages) return null
+  const page = state.schema.pages.find(p => p.id === state.currentPageId)
+  return page?.componentTree ?? null
+}
+
+// Update schema.componentTree to reference the current page's tree (for UI reads)
+function syncTreeRef(state: EditorState): void {
+  const tree = getEditingTree(state)
+  if (tree) state.schema.componentTree = tree
 }
 
 const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = (set, get) => {
@@ -196,7 +199,9 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
     addNode: (parentId, componentName, index) => {
       set((state) => {
-        const parent = findNodeById(state.schema.componentTree, parentId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const parent = findNodeById(tree, parentId)
         if (!parent) return
         if (!parent.children) parent.children = []
 
@@ -242,7 +247,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
         const i = index ?? parent.children.length
         parent.children.splice(i, 0, node)
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         state.selectedNodeId = node.id
         pushHistory(state)
       })
@@ -250,8 +255,10 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
     removeNode: (nodeId) => {
       set((state) => {
-        removeNodeFromTree(state.schema.componentTree, nodeId)
-        syncCurrentPageTree(state)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        removeNodeFromTree(tree, nodeId)
+        syncTreeRef(state)
         if (state.selectedNodeId === nodeId) {
           state.selectedNodeId = null
         }
@@ -261,48 +268,58 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
     moveNode: (nodeId, targetParentId, index) => {
       set((state) => {
-        moveNodeInTree(state.schema.componentTree, nodeId, targetParentId, index)
-        syncCurrentPageTree(state)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        moveNodeInTree(tree, nodeId, targetParentId, index)
+        syncTreeRef(state)
         pushHistory(state)
       })
     },
 
     updateNodeProps: (nodeId, props) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node) return
         Object.assign(node.props, props)
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistoryDebounced(state)
       })
     },
 
     updateNodeStyles: (nodeId, styles) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node) return
         Object.assign(node.styles, styles)
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistoryDebounced(state)
       })
     },
 
     updateNodeLoop: (nodeId, loop) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node) return
         node.loop = loop
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistory(state)
       })
     },
 
     updateNodeCondition: (nodeId, condition) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node) return
         node.condition = condition
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistory(state)
       })
     },
@@ -457,21 +474,25 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
     updateNodeEvents: (nodeId, eventName, actions) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node) return
         if (!node.events) node.events = {}
         node.events[eventName] = actions
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistory(state)
       })
     },
 
     removeNodeEvent: (nodeId, eventName) => {
       set((state) => {
-        const node = findNodeById(state.schema.componentTree, nodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+        const node = findNodeById(tree, nodeId)
         if (!node || !node.events) return
         delete node.events[eventName]
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         pushHistory(state)
       })
     },
@@ -571,9 +592,10 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
     // Copy/Paste actions (M3)
     copyNode: (nodeId) => {
       const state = get()
-      const node = findNodeById(state.schema.componentTree, nodeId)
+      const tree = state.schema.componentTree
+      if (!tree) return
+      const node = findNodeById(tree, nodeId)
       if (!node || node.component === 'Page') {
-        // Cannot copy Page node
         return
       }
       set({ clipboard: structuredClone(node) })
@@ -584,11 +606,13 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (!state.clipboard) return
         if (!state.selectedNodeId) return
 
-        const selectedNode = findNodeById(state.schema.componentTree, state.selectedNodeId)
+        const tree = getEditingTree(state)
+        if (!tree) return
+
+        const selectedNode = findNodeById(tree, state.selectedNodeId)
         if (!selectedNode) return
 
-        // Find parent of selected node
-        const parent = findParentNode(state.schema.componentTree, state.selectedNodeId)
+        const parent = findParentNode(tree, state.selectedNodeId)
         if (!parent || !parent.children) return
 
         // Clone the clipboard node with new IDs
@@ -598,7 +622,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         const selectedIndex = parent.children.findIndex(c => c.id === state.selectedNodeId)
         parent.children.splice(selectedIndex + 1, 0, clonedNode)
 
-        syncCurrentPageTree(state)
+        syncTreeRef(state)
         state.selectedNodeId = clonedNode.id
         pushHistory(state)
       })
@@ -621,20 +645,8 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         const page = findPageById(state.schema, pageId)
         if (!page) return
 
-        // Save current page's componentTree back to pages array before switching
-        if (state.currentPageId) {
-          const currentPage = findPageById(state.schema, state.currentPageId)
-          if (currentPage) {
-            currentPage.componentTree = state.schema.componentTree
-          }
-        }
-
-        // Load the new page's componentTree
-        const targetPage = findPageById(state.schema, pageId)
-        if (targetPage) {
-          state.schema.componentTree = targetPage.componentTree
-        }
-
+        // Pages are the source of truth — just load the new page's tree
+        state.schema.componentTree = page.componentTree
         state.currentPageId = pageId
         state.selectedNodeId = null
       })
@@ -642,13 +654,10 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
 
     addPage: (name, title) => {
       set((state) => {
-        // Save current page's componentTree before switching
-        syncCurrentPageTree(state)
-
         const newPage = createEmptyPage(name, title)
         addPageToSchema(state.schema, newPage)
 
-        // Switch componentTree to the new page
+        // Switch to the new page
         state.schema.componentTree = newPage.componentTree
 
         state.currentPageId = newPage.id

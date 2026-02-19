@@ -65,6 +65,7 @@ export interface IRStateVar {
 export interface IREffect {
   trigger: string
   body: string
+  dependencies?: string[]  // useEffect dependency array (empty = mount only)
 }
 
 export interface IRHandler {

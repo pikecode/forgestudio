@@ -12,10 +12,10 @@ function convertExprVars(expr: string): string {
   return expr.trim()
     .replace(/\$state\.(\w+)/g, '$1')
     .replace(/\$item\.(\w+)/g, 'item.$1')
-    // Handle data source field access: $ds.dataSourceId.fieldName -> dataSourceIdData?.fieldName
+    // Handle $ds.dataSourceId.data -> dataSourceIdData (must come before generic field access)
+    .replace(/\$ds\.(\w+)\.data\b/g, '$1Data')
+    // Handle $ds.dataSourceId.fieldName -> dataSourceIdData?.fieldName
     .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
-    // Handle data source data access: $ds.dataSourceId.data -> dataSourceIdData
-    .replace(/\$ds\.(\w+)\.data/g, '$1Data')
     .replace(/^\$/, '')  // fallback: strip leading $ for simple $item references
 }
 
@@ -69,7 +69,10 @@ export function generateTSX(ir: IRPage): string {
 
   // Generate effects
   const effectsCode = ir.effects.map(e => {
-    return `  useEffect(() => {\n    ${e.body}\n  }, [])`
+    const deps = e.dependencies && e.dependencies.length > 0
+      ? e.dependencies.join(', ')
+      : ''
+    return `  useEffect(() => {\n    ${e.body}\n  }, [${deps}])`
   }).join('\n\n')
 
   // Generate handlers

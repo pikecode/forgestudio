@@ -215,9 +215,18 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
         fetchBody = `${dependencyCheck}${paramsDecl}Taro.request({ url: ${urlExpr}, method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n      })`
       }
 
+      // Build dependency list for useEffect
+      const effectDeps: string[] = []
+      if (ds.dependsOn && ds.dependsOn.length > 0) {
+        for (const depId of ds.dependsOn) {
+          effectDeps.push(`${sanitizeVarName(depId)}Data`)
+        }
+      }
+
       effects.push({
         trigger: 'mount',
         body: fetchBody,
+        dependencies: effectDeps.length > 0 ? effectDeps : undefined,
       })
     }
   }
