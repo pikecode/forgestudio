@@ -1,4 +1,4 @@
-import { create, StateCreator } from 'zustand'
+import { create, type StoreApi, type UseBoundStore, StateCreator } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { current } from 'immer'
@@ -669,8 +669,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
   }
 }
 
-// @ts-ignore - Immer draft types leak into export, but functionality is correct
-export const useEditorStore = create<EditorState>()(
+export const useEditorStore: UseBoundStore<StoreApi<EditorState>> = create<EditorState>()(
   persist(
     immer(storeCreator),
     {

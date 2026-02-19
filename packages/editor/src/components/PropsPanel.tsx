@@ -166,12 +166,6 @@ export function PropsPanel() {
           >
             代码
           </button>
-          <button
-            className={`forge-editor-tab ${rightPanelTab === 'preview' ? 'forge-editor-tab--active' : ''}`}
-            onClick={() => setRightPanelTab('preview')}
-          >
-            预览
-          </button>
         </div>
         <div className="forge-editor-panel__empty">选择一个组件以编辑属性</div>
       </div>
@@ -205,12 +199,6 @@ export function PropsPanel() {
           onClick={() => setRightPanelTab('code')}
         >
           代码
-        </button>
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'preview' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('preview')}
-        >
-          预览
         </button>
       </div>
       <div className="forge-editor-panel__title">
@@ -582,7 +570,7 @@ export function PropsPanel() {
         {showStateManager && (
           <div style={{ padding: '8px 12px' }}>
             <StatePanel
-              schema={{ ...schema, formStates: pageFormStates }}
+              formStates={pageFormStates}
               addFormState={addFormState}
               updateFormState={updateFormState}
               removeFormState={removeFormState}
