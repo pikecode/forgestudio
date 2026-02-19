@@ -29,7 +29,7 @@ FSP Schema (JSON) → Editor (visual manipulation) → IR (intermediate repr) �
 ### Packages
 
 - **`packages/protocol`** — FSP (ForgeStudio Protocol) type definitions. The shared schema that all other packages depend on. Defines `ComponentNode`, `FSPSchema`, `DataSourceDef`, action types.
-- **`packages/components`** — Component registry with 14 built-in component metadata definitions (Page, View, Text, Image, Button, Input, List, Card, etc.). Registry pattern via `registry.ts`.
+- **`packages/components`** — Component registry with 16 built-in component metadata definitions (Page, View, Text, Image, Button, Input, List, Card, Switch, Textarea, ScrollView, Form, Swiper, SwiperItem, Modal). Registry pattern via `registry.ts`.
 - **`packages/editor`** — Visual editor UI. React + Zustand + @dnd-kit. Central state in `store.ts` (Zustand with undo/redo history). Renderer system in `renderer/`, property editors in `setters/`.
 - **`packages/codegen-core`** — IR layer + plugin interface. `transformer.ts` converts FSP → IR. `html-renderer.ts` for HTML output. Plugins implement the codegen interface.
 - **`packages/codegen-taro`** — Taro 4.x code generation plugin. Maps FSP components/props to Taro equivalents. Templates in `templates/` for scaffold files.

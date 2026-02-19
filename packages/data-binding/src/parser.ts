@@ -4,8 +4,9 @@ const EXPRESSION_REGEX = /\{\{([^}]+)\}\}/g
 
 // Check if expression contains operators (complex expression)
 function isComplexExpression(expr: string): boolean {
-  // Check for operators: >, <, >=, <=, ===, !==, ==, !=, &&, ||, ?, :
-  return /[><=!&|?:]/.test(expr)
+  // Check for comparison, logical, ternary, and arithmetic operators
+  // Exclude dots and dollar signs which are part of path expressions
+  return /[><=!&|?:+\-*/%]/.test(expr) && !/^[\w$.\[\]]+$/.test(expr)
 }
 
 export function parseExpression(template: string): ParsedPart[] {
@@ -35,22 +36,13 @@ export function parseExpression(template: string): ParsedPart[] {
         expression: expr,
       })
     } else {
-      // Simple path expression
+      // Simple path expression — no depth limit
       const path = expr.split('.').map((p) => p.trim())
 
-      // Validate: allow up to 4-part paths (e.g. $item.detail.info.name)
-      if (path.length > 4) {
-        // Invalid expression - treat as static
-        parts.push({
-          type: 'static',
-          value: match[0],
-        })
-      } else {
-        parts.push({
-          type: 'expression',
-          path,
-        })
-      }
+      parts.push({
+        type: 'expression',
+        path,
+      })
     }
 
     lastIndex = matchIndex + match[0].length

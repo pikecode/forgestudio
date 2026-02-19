@@ -11,7 +11,7 @@ interface TreeNodeProps {
   index: number
 }
 
-function TreeNode({ node, level, parentId, index }: TreeNodeProps) {
+const TreeNode = React.memo(function TreeNode({ node, level, parentId, index }: TreeNodeProps) {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
   const selectNode = useEditorStore((s) => s.selectNode)
   const [collapsed, setCollapsed] = useState(false)
@@ -135,7 +135,7 @@ function TreeNode({ node, level, parentId, index }: TreeNodeProps) {
       )}
     </div>
   )
-}
+})
 
 export function TreePanel() {
   const schema = useEditorStore((s) => s.schema)

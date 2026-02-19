@@ -2,7 +2,7 @@ import React from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { getDraggableComponents } from '@forgestudio/components'
 
-function DraggableItem({ name, title }: { name: string; title: string }) {
+const DraggableItem = React.memo(function DraggableItem({ name, title }: { name: string; title: string }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `palette-${name}`,
     data: { type: 'palette', componentName: name },
@@ -19,7 +19,7 @@ function DraggableItem({ name, title }: { name: string; title: string }) {
       {title}
     </div>
   )
-}
+})
 
 export function ComponentPanel() {
   const components = getDraggableComponents()

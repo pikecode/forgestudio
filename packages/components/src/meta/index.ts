@@ -189,12 +189,12 @@ export const TextareaMeta: ComponentMeta = {
   icon: 'align-left',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', maxlength: 200 },
+  defaultProps: { placeholder: '请输入', maxLength: 200 },
   defaultStyles: {},
   supportedEvents: ['onChange'],
   propsSchema: [
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
-    { name: 'maxlength', title: '最大长度', type: 'number', default: 200 },
+    { name: 'maxLength', title: '最大长度', type: 'number', default: 200 },
   ],
 }
 

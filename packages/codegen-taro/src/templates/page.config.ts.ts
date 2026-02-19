@@ -1,5 +1,7 @@
 export function generatePageConfig(title: string): string {
-  return `export default definePageConfig({
+  return `import { definePageConfig } from '@tarojs/taro'
+
+export default definePageConfig({
   navigationBarTitleText: '${title}',
 })
 `

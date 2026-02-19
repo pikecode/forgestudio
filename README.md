@@ -16,7 +16,7 @@ pnpm install
 cd apps/web && pnpm dev
 ```
 
-访问 http://localhost:5180/ 打开编辑器。
+访问 http://localhost:5173/ 打开编辑器。
 
 ### 体验演示
 
@@ -94,7 +94,7 @@ cd apps/web && pnpm dev
 forgestudio/
 ├── packages/
 │   ├── protocol/          # FSP 类型定义
-│   ├── components/        # 组件注册表（14个组件）
+│   ├── components/        # 组件注册表（16个组件）
 │   ├── editor/            # 编辑器 UI（支持所有组件的 Renderer）
 │   ├── codegen-core/      # IR + 插件接口
 │   ├── codegen-taro/      # Taro 代码生成器
@@ -150,7 +150,7 @@ npx turbo build --filter=@forgestudio/codegen-core
 - ✅ 所有包编译成功
 - ✅ TypeScript 0 错误
 - ✅ Vite bundle: ~405KB JS + 6.66KB CSS
-- ✅ 开发服务器: http://localhost:5180/
+- ✅ 开发服务器: http://localhost:5173/
 
 ## 🎉 里程碑
 

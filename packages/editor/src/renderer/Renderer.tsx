@@ -183,7 +183,7 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
       return (
         <textarea
           placeholder={String(evaluatedProps.placeholder ?? '')}
-          maxLength={Number(evaluatedProps.maxlength ?? 200)}
+          maxLength={Number(evaluatedProps.maxLength ?? 200)}
           style={{
             padding: '6px 8px',
             border: '1px solid #ddd',
@@ -297,7 +297,7 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
   }
 }
 
-export function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
+export const NodeRenderer = React.memo(function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
   const schema = useEditorStore((s) => s.schema)
   const currentPageId = useEditorStore((s) => s.currentPageId)
   const currentPage = currentPageId ? schema.pages?.find(p => p.id === currentPageId) ?? null : null
@@ -447,4 +447,4 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
   }
 
   return <EditWrapper node={node}>{renderComponent(node, fullContext)}</EditWrapper>
-}
+})

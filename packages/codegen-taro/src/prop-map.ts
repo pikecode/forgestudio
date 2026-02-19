@@ -66,7 +66,7 @@ export function mapProps(
       result['placeholder'] = `"${String(val)}"`
       continue
     }
-    if (tag === 'Textarea' && key === 'maxlength') {
+    if (tag === 'Textarea' && key === 'maxLength') {
       result['maxlength'] = `{${val}}`
       continue
     }

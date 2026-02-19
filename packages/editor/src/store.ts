@@ -101,6 +101,7 @@ export interface EditorState {
 
 // History management constants
 const MAX_HISTORY_SIZE = 50
+const HISTORY_DEBOUNCE_MS = 300
 
 // Helper function to generate unique IDs
 function generateUniqueId(): string {
@@ -136,6 +137,27 @@ function pushHistory(state: EditorState): void {
 
   state.history = newHistory
   state.historyIndex = newHistory.length - 1
+}
+
+// Debounced history push — coalesces rapid changes (e.g. typing) into one entry
+let historyTimer: ReturnType<typeof setTimeout> | null = null
+function pushHistoryDebounced(state: EditorState): void {
+  // Snapshot the schema immediately (we're inside Immer draft)
+  const snapshot = current(state).schema
+  const pageId = state.currentPageId
+
+  if (historyTimer) clearTimeout(historyTimer)
+  historyTimer = setTimeout(() => {
+    historyTimer = null
+    const s = useEditorStore.getState()
+    const newHistory = s.history.slice(0, s.historyIndex + 1)
+    newHistory.push({ schema: snapshot, currentPageId: pageId })
+    if (newHistory.length > MAX_HISTORY_SIZE) newHistory.shift()
+    useEditorStore.setState({
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+    })
+  }, HISTORY_DEBOUNCE_MS)
 }
 
 // Helper function to sync componentTree changes back to pages array
@@ -251,7 +273,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (!node) return
         Object.assign(node.props, props)
         syncCurrentPageTree(state)
-        pushHistory(state)
+        pushHistoryDebounced(state)
       })
     },
 
@@ -261,7 +283,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (!node) return
         Object.assign(node.styles, styles)
         syncCurrentPageTree(state)
-        pushHistory(state)
+        pushHistoryDebounced(state)
       })
     },
 

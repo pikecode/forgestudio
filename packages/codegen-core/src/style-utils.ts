@@ -1,10 +1,13 @@
 // Style conversion utilities
 
-// Whitelist of supported CSS properties for M1.2
+// Whitelist of supported CSS properties
 const SUPPORTED_STYLE_PROPS = new Set([
   'width',
   'height',
+  'minWidth',
   'minHeight',
+  'maxWidth',
+  'maxHeight',
   'margin',
   'marginTop',
   'marginRight',
@@ -27,16 +30,35 @@ const SUPPORTED_STYLE_PROPS = new Set([
   'borderStyle',
   'display',
   'flexDirection',
+  'flexWrap',
   'justifyContent',
   'alignItems',
+  'alignSelf',
+  'flex',
   'gap',
+  'position',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'zIndex',
+  'overflow',
+  'overflowX',
+  'overflowY',
+  'opacity',
+  'boxShadow',
+  'textOverflow',
+  'whiteSpace',
 ])
 
 // Numeric properties that need px suffix
 const NUMERIC_PX_PROPS = new Set([
   'width',
   'height',
+  'minWidth',
   'minHeight',
+  'maxWidth',
+  'maxHeight',
   'margin',
   'marginTop',
   'marginRight',
@@ -52,6 +74,10 @@ const NUMERIC_PX_PROPS = new Set([
   'borderRadius',
   'borderWidth',
   'gap',
+  'top',
+  'right',
+  'bottom',
+  'left',
 ])
 
 export function camelToKebab(str: string): string {

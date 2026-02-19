@@ -9,7 +9,7 @@ interface EditWrapperProps {
   children: React.ReactNode
 }
 
-export function EditWrapper({ node, children }: EditWrapperProps) {
+export const EditWrapper = React.memo(function EditWrapper({ node, children }: EditWrapperProps) {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
   const selectNode = useEditorStore((s) => s.selectNode)
   const isSelected = selectedNodeId === node.id
@@ -55,4 +55,4 @@ export function EditWrapper({ node, children }: EditWrapperProps) {
       )}
     </div>
   )
-}
+})
