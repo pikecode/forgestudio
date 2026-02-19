@@ -116,7 +116,7 @@ export function DataSourcePanel() {
         options: {
           url: formData.url,
           method: formData.method,
-          headers: undefined,
+          headers: Object.keys(formData.headers).length > 0 ? formData.headers : undefined,
           body: formData.body || undefined,
         },
         autoFetch: formData.autoFetch,
@@ -133,7 +133,7 @@ export function DataSourcePanel() {
         options: {
           url: formData.url,
           method: formData.method,
-          headers: undefined,
+          headers: Object.keys(formData.headers).length > 0 ? formData.headers : undefined,
           body: formData.body || undefined,
         },
         autoFetch: formData.autoFetch,
@@ -163,7 +163,7 @@ export function DataSourcePanel() {
         options: {
           url: formData.url,
           method: formData.method,
-          headers: undefined,
+          headers: Object.keys(formData.headers).length > 0 ? formData.headers : undefined,
           body: formData.body || undefined,
         },
         autoFetch: formData.autoFetch,
@@ -179,7 +179,7 @@ export function DataSourcePanel() {
         options: {
           url: formData.url,
           method: formData.method,
-          headers: undefined,
+          headers: Object.keys(formData.headers).length > 0 ? formData.headers : undefined,
           body: formData.body || undefined,
         },
         autoFetch: formData.autoFetch,
@@ -203,7 +203,7 @@ export function DataSourcePanel() {
       autoFetch: ds.autoFetch,
       dependsOn: ds.dependsOn || [],
       body: ds.options?.body || '',
-      headers: {},
+      headers: ds.options?.headers || {},
       responseFields: ds.responseFields || [],
       sampleData: ds.sampleData || []
     })
@@ -316,7 +316,10 @@ export function DataSourcePanel() {
 
       const res = await fetch(requestUrl, {
         method: formData.method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...formData.headers,
+        },
         body: formData.method !== 'GET' && formData.body ? formData.body : undefined
       })
 
@@ -861,6 +864,85 @@ export function DataSourcePanel() {
               </div>
             </div>
           )}
+
+          {/* Request Headers */}
+          <div style={{ marginBottom: 8 }}>
+            <details style={{ border: '1px solid #e0e0e0', borderRadius: 4, padding: 8 }}>
+              <summary style={{ fontSize: 13, color: '#555', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}>
+                请求头 (Headers) {Object.keys(formData.headers || {}).length > 0 && `(${Object.keys(formData.headers).length})`}
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
+                  配置 HTTP 请求头，如 Content-Type、Authorization 等
+                </div>
+
+                {/* Common header presets */}
+                <div style={{ marginBottom: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      if (!formData.headers['Content-Type']) {
+                        setFormData({ ...formData, headers: { ...formData.headers, 'Content-Type': 'application/json' } })
+                      }
+                    }}
+                    style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                  >
+                    + Content-Type
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!formData.headers['Authorization']) {
+                        setFormData({ ...formData, headers: { ...formData.headers, 'Authorization': 'Bearer ' } })
+                      }
+                    }}
+                    style={{ padding: '2px 6px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer' }}
+                  >
+                    + Authorization
+                  </button>
+                </div>
+
+                {/* Headers list */}
+                {Object.entries(formData.headers || {}).map(([key, value]) => (
+                  <div key={key} style={{ marginBottom: 6, padding: 6, backgroundColor: '#fafafa', borderRadius: 4, border: '1px solid #e0e0e0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, color: '#666', fontWeight: 500 }}>{key}</span>
+                      <button
+                        onClick={() => {
+                          const newHeaders = { ...formData.headers }
+                          delete newHeaders[key]
+                          setFormData({ ...formData, headers: newHeaders })
+                        }}
+                        style={{ padding: '1px 4px', fontSize: 10, color: '#ff4d4f', background: 'transparent', border: '1px solid #ff4d4f', borderRadius: 2, cursor: 'pointer' }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => {
+                        setFormData({ ...formData, headers: { ...formData.headers, [key]: e.target.value } })
+                      }}
+                      placeholder="header value"
+                      style={{ width: '100%', padding: '3px 6px', fontSize: 11, border: '1px solid #d0d0d0', borderRadius: 3 }}
+                    />
+                  </div>
+                ))}
+
+                {/* Add custom header */}
+                <button
+                  onClick={() => {
+                    const key = prompt('请输入 Header 名称（如 X-Custom-Header）')
+                    if (key && key.trim()) {
+                      setFormData({ ...formData, headers: { ...formData.headers, [key.trim()]: '' } })
+                    }
+                  }}
+                  style={{ padding: '4px 8px', fontSize: 11, color: '#1890ff', background: '#fff', border: '1px solid #1890ff', borderRadius: 3, cursor: 'pointer', width: '100%' }}
+                >
+                  + 添加自定义 Header
+                </button>
+              </div>
+            </details>
+          </div>
 
             <div style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -216,12 +216,16 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
 
       // Generate different logic for object vs array
       let fetchBody: string
+      // Build header object if headers are configured
+      const headerExpr = ds.options.headers && Object.keys(ds.options.headers).length > 0
+        ? `, header: ${JSON.stringify(ds.options.headers)}`
+        : ''
       if (isObjectType) {
         // Object type: directly set response data
-        fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}' })\n      .then(res => {\n        if (res.data) set${capitalizedName}(res.data)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
+        fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        if (res.data) set${capitalizedName}(res.data)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
       } else {
         // Array type: use extractList helper
-        fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}' })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
+        fetchBody = `${dependencyCheck}${paramsDecl}set${capitalizedName.replace('Data', 'Loading')}(true)\n    Taro.request({ url: ${urlExpr}, method: '${ds.options.method}'${headerExpr} })\n      .then(res => {\n        const list = extractList(res.data)\n        if (list.length) set${capitalizedName}(list)\n      })\n      .catch(err => {\n        console.error('Failed to fetch ${ds.id}:', err)\n        Taro.showToast({ title: '加载失败', icon: 'error' })\n      })\n      .finally(() => {\n        set${capitalizedName.replace('Data', 'Loading')}(false)\n      })`
       }
 
       // Build dependency list for useEffect
