@@ -4,6 +4,7 @@ import { getEffectiveDataSources } from '@forgestudio/protocol'
 import { EditWrapper } from './EditWrapper'
 import { evaluate, hasExpression, type ExpressionContext } from '@forgestudio/data-binding'
 import { useEditorStore } from '../store'
+import { rendererRegistry } from './renderers'
 
 /** Map FSP component names to simple HTML renderers for the editor canvas */
 function renderComponent(node: ComponentNode, context?: ExpressionContext): React.ReactNode {
@@ -19,6 +20,22 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
     }
   }
 
+  // Helper to render children
+  const renderChildren = () => (
+    <>
+      {(node.children ?? []).map((child) => (
+        <NodeRenderer key={child.id} node={child} context={context} />
+      ))}
+    </>
+  )
+
+  // Try registry first (new pattern)
+  if (rendererRegistry.has(node.component)) {
+    const renderer = rendererRegistry.get(node.component)!
+    return renderer({ node, context, evaluatedProps, style, renderChildren })
+  }
+
+  // Fallback to switch statement (legacy pattern)
   switch (node.component) {
     case 'Page':
       return (
