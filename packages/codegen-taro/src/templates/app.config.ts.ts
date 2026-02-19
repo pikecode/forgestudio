@@ -1,9 +1,7 @@
 export function generateAppConfig(pages: Array<{ name: string; path: string; title: string }>): string {
   const pagePaths = pages.map(p => `'${p.path}'`).join(',\n    ')
 
-  return `import { defineAppConfig } from '@tarojs/taro'
-
-export default defineAppConfig({
+  return `export default {
   pages: [
     ${pagePaths}
   ],
@@ -13,6 +11,6 @@ export default defineAppConfig({
     navigationBarTitleText: 'ForgeStudio',
     navigationBarTextStyle: 'black',
   },
-})
+}
 `
 }
