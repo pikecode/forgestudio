@@ -119,6 +119,13 @@ export interface DataSourceDef {
   responseFields?: FieldSchema[]
   /** Dependencies: data sources that must be fetched before this one (M2) */
   dependsOn?: string[]
+  /** Pagination configuration (M5) */
+  pagination?: {
+    type: 'page' | 'cursor'
+    pageSize: number
+    pageParam?: string   // Page number parameter name (default: 'page')
+    sizeParam?: string   // Page size parameter name (default: 'pageSize')
+  }
 }
 
 /** Action types for event handlers (M1.4) */

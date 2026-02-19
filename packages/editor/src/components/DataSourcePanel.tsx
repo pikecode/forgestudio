@@ -36,6 +36,7 @@ export function DataSourcePanel() {
     body: '',
     autoFetch: true,
     dependsOn: [] as string[],
+    pagination: undefined as { type: 'page' | 'cursor'; pageSize: number; pageParam?: string; sizeParam?: string } | undefined,
     responseFields: [] as import('@forgestudio/protocol').FieldSchema[],
     sampleData: [] as unknown[],
   })
@@ -64,7 +65,8 @@ export function DataSourcePanel() {
       body: '',
       headers: {},
       responseFields: [],
-      sampleData: []
+      sampleData: [],
+      pagination: undefined,
     })
     setEditingId(null)
     setSelectedTemplate(null)
@@ -123,6 +125,7 @@ export function DataSourcePanel() {
         responseFields: formData.responseFields,
         sampleData: formData.sampleData,
         dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
+        pagination: formData.pagination,
       })
     } else {
       addDataSource({
@@ -140,6 +143,7 @@ export function DataSourcePanel() {
         responseFields: formData.responseFields,
         sampleData: formData.sampleData,
         dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
+        pagination: formData.pagination,
       })
     }
     resetForm()
@@ -170,6 +174,7 @@ export function DataSourcePanel() {
         responseFields: formData.responseFields,
         sampleData: formData.sampleData,
         dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
+        pagination: formData.pagination,
       })
     } else {
       updateDataSource(id, {
@@ -186,6 +191,7 @@ export function DataSourcePanel() {
         responseFields: formData.responseFields,
         sampleData: formData.sampleData,
         dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
+        pagination: formData.pagination,
       })
     }
     resetForm()
@@ -205,7 +211,8 @@ export function DataSourcePanel() {
       body: ds.options?.body || '',
       headers: ds.options?.headers || {},
       responseFields: ds.responseFields || [],
-      sampleData: ds.sampleData || []
+      sampleData: ds.sampleData || [],
+      pagination: ds.pagination,
     })
   }
 
@@ -954,6 +961,94 @@ export function DataSourcePanel() {
                 自动获取
               </label>
             </div>
+
+            {/* Pagination configuration */}
+            {formData.dataType === 'array' && (
+              <details style={{ marginBottom: 8, border: '1px solid #e0e0e0', borderRadius: 4, padding: 8 }}>
+                <summary style={{ fontSize: 13, color: '#555', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}>
+                  分页配置 {formData.pagination && '(已启用)'}
+                </summary>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 12, color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={!!formData.pagination}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, pagination: { type: 'page', pageSize: 10, pageParam: 'page', sizeParam: 'pageSize' } })
+                          } else {
+                            setFormData({ ...formData, pagination: undefined })
+                          }
+                        }}
+                      />
+                      启用分页
+                    </label>
+                  </div>
+
+                  {formData.pagination && (
+                    <>
+                      <div style={{ marginBottom: 6 }}>
+                        <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                          分页类型
+                        </label>
+                        <select
+                          value={formData.pagination.type}
+                          onChange={(e) => setFormData({ ...formData, pagination: { ...formData.pagination!, type: e.target.value as 'page' | 'cursor' } })}
+                          style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                        >
+                          <option value="page">页码分页</option>
+                          <option value="cursor">游标分页</option>
+                        </select>
+                      </div>
+
+                      <div style={{ marginBottom: 6 }}>
+                        <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                          每页数量
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.pagination.pageSize}
+                          onChange={(e) => setFormData({ ...formData, pagination: { ...formData.pagination!, pageSize: Number(e.target.value) || 10 } })}
+                          placeholder="10"
+                          style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                        />
+                      </div>
+
+                      <div style={{ marginBottom: 6 }}>
+                        <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                          页码参数名
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.pagination.pageParam || ''}
+                          onChange={(e) => setFormData({ ...formData, pagination: { ...formData.pagination!, pageParam: e.target.value } })}
+                          placeholder="page"
+                          style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                        />
+                      </div>
+
+                      <div style={{ marginBottom: 6 }}>
+                        <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+                          每页数量参数名
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.pagination.sizeParam || ''}
+                          onChange={(e) => setFormData({ ...formData, pagination: { ...formData.pagination!, sizeParam: e.target.value } })}
+                          placeholder="pageSize"
+                          style={{ width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }}
+                        />
+                      </div>
+
+                      <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                        分页参数将自动添加到请求 URL 中
+                      </div>
+                    </>
+                  )}
+                </div>
+              </details>
+            )}
 
             {/* Dependencies selector (M2) */}
             {dataSources.length > 0 && (
