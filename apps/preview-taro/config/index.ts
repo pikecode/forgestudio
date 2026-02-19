@@ -51,8 +51,9 @@ export default {
   h5: {
     publicPath: '/',
     staticDirectory: 'static',
+    ssr: false,
     router: {
-      mode: 'browser',
+      mode: 'hash',
       basename: '/'
     },
     output: {
