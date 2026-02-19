@@ -253,6 +253,74 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
       type: fs.type === 'number' ? 'number' : fs.type === 'boolean' ? 'boolean' : 'string',
       defaultValue: fs.defaultValue ?? (fs.type === 'number' ? 0 : fs.type === 'boolean' ? false : ''),
     })
+
+    // Add error state variable if validation rules exist
+    if (fs.rules && fs.rules.length > 0) {
+      stateVars.push({
+        name: `${fs.id}Error`,
+        type: 'string',
+        defaultValue: '',
+      })
+    }
+  }
+
+  // Generate validation handlers for form states with rules
+  for (const fs of pageFormStates) {
+    if (fs.rules && fs.rules.length > 0) {
+      const capitalizedName = fs.id.charAt(0).toUpperCase() + fs.id.slice(1)
+      let validationBody = ''
+
+      for (const rule of fs.rules) {
+        const errorMsg = rule.message || '验证失败'
+
+        switch (rule.type) {
+          case 'required':
+            if (fs.type === 'string') {
+              validationBody += `if (!${fs.id} || ${fs.id}.trim() === '') {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            } else {
+              validationBody += `if (${fs.id} === undefined || ${fs.id} === null) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+
+          case 'minLength':
+            if (fs.type === 'string' && rule.value !== undefined) {
+              validationBody += `if (${fs.id}.length < ${rule.value}) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+
+          case 'maxLength':
+            if (fs.type === 'string' && rule.value !== undefined) {
+              validationBody += `if (${fs.id}.length > ${rule.value}) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+
+          case 'min':
+            if (fs.type === 'number' && rule.value !== undefined) {
+              validationBody += `if (${fs.id} < ${rule.value}) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+
+          case 'max':
+            if (fs.type === 'number' && rule.value !== undefined) {
+              validationBody += `if (${fs.id} > ${rule.value}) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+
+          case 'pattern':
+            if (fs.type === 'string' && rule.value !== undefined) {
+              validationBody += `if (!/${rule.value}/.test(${fs.id})) {\n      set${capitalizedName}Error('${errorMsg}')\n      return false\n    }\n    `
+            }
+            break
+        }
+      }
+
+      validationBody += `set${capitalizedName}Error('')\n    return true`
+
+      handlers.push({
+        name: `validate${capitalizedName}`,
+        body: validationBody,
+      })
+    }
   }
 
   // Helper to generate handler body from actions
