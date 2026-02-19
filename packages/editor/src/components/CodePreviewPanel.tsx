@@ -6,6 +6,7 @@ import scss from 'highlight.js/lib/languages/scss'
 import json from 'highlight.js/lib/languages/json'
 import 'highlight.js/styles/github.css'
 import { useEditorStore } from '../store'
+import { RightPanelTabs } from './RightPanelTabs'
 
 hljs.registerLanguage('typescript', typescript)
 hljs.registerLanguage('scss', scss)
@@ -20,26 +21,7 @@ export function CodePreviewPanel() {
   if (!generatedProject) {
     return (
       <div className="forge-editor-panel forge-editor-panel--right">
-        <div className="forge-editor-tabs">
-          <button
-            className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
-            onClick={() => setRightPanelTab('props')}
-          >
-            属性
-          </button>
-          <button
-            className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
-            onClick={() => setRightPanelTab('datasource')}
-          >
-            数据源
-          </button>
-          <button
-            className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
-            onClick={() => setRightPanelTab('code')}
-          >
-            代码
-          </button>
-        </div>
+        <RightPanelTabs activeTab={rightPanelTab} onTabChange={setRightPanelTab} />
         <div className="forge-editor-panel__empty">
           点击"生成 Taro 代码"按钮查看生成的代码
         </div>
@@ -81,26 +63,7 @@ export function CodePreviewPanel() {
 
   return (
     <div className="forge-editor-panel forge-editor-panel--right">
-      <div className="forge-editor-tabs">
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('props')}
-        >
-          属性
-        </button>
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('datasource')}
-        >
-          数据源
-        </button>
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('code')}
-        >
-          代码
-        </button>
-      </div>
+      <RightPanelTabs activeTab={rightPanelTab} onTabChange={setRightPanelTab} />
 
       <div className="forge-editor-code-preview">
         <div className="forge-editor-file-tree">
@@ -126,6 +89,7 @@ export function CodePreviewPanel() {
             </button>
           </div>
           <pre className="forge-editor-code-block">
+            {/* Safe: hljs.highlight() only adds <span> tags with CSS classes, no executable code */}
             <code
               className="hljs"
               dangerouslySetInnerHTML={{ __html: highlightedCode }}

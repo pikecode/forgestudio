@@ -96,7 +96,7 @@ export function DataBindingSection() {
       {showStateManager && (
         <div style={{ padding: '8px 12px' }}>
           <StatePanel
-            schema={{ ...schema, formStates: pageFormStates }}
+            formStates={pageFormStates}
             addFormState={addFormState}
             updateFormState={updateFormState}
             removeFormState={removeFormState}

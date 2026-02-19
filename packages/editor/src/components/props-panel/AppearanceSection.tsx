@@ -1,7 +1,7 @@
 import React from 'react'
 import type { ComponentNode, PropDefinition } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
-import { findNodeById } from '@forgestudio/protocol'
+import { findNodeById, getEffectiveDataSources } from '@forgestudio/protocol'
 import { useEditorStore } from '../../store'
 import {
   StringSetter,
@@ -47,6 +47,8 @@ export function AppearanceSection() {
   const currentPage = getCurrentPage()
   const pageDataSources = currentPage?.dataSources ?? []
   const pageFormStates = currentPage?.formStates ?? []
+  // Include global data sources that are referenced by this page
+  const effectiveDataSources = currentPage ? getEffectiveDataSources(schema, currentPage.id) : []
 
   const node = selectedNodeId ? findNodeById(schema.componentTree, selectedNodeId) : null
   if (!node) return null
@@ -72,7 +74,7 @@ export function AppearanceSection() {
       <div className="forge-editor-panel__section">属性</div>
       {propsSchema.map((def) => {
         if (node.component === 'List' && def.name === 'dataSourceId') {
-          const dsOptions = pageDataSources.map((ds) => ({ label: ds.label || ds.id, value: ds.id }))
+          const dsOptions = effectiveDataSources.map((ds) => ({ label: ds.label || ds.id, value: ds.id }))
           if (dsOptions.length === 0) {
             return (
               <div key={def.name} style={{ padding: '8px 12px', color: '#999', fontSize: 12 }}>
@@ -92,7 +94,7 @@ export function AppearanceSection() {
         }
 
         if (def.type === 'string' && loopAncestor) {
-          const fields = getDataSourceFields(pageDataSources, loopAncestor.loop!.dataSourceId)
+          const fields = getDataSourceFields(effectiveDataSources, loopAncestor.loop!.dataSourceId)
           if (fields.length > 0) {
             const fieldOptions = fields.map((f) => ({ label: `$item.${f}`, value: `{{$item.${f}}}` }))
             return (
@@ -108,10 +110,10 @@ export function AppearanceSection() {
           }
         }
 
-        if (def.type === 'string' && !loopAncestor && pageDataSources.length > 0) {
+        if (def.type === 'string' && !loopAncestor && effectiveDataSources.length > 0) {
           const dsFieldOptions: Array<{ dataSourceId: string; fieldName: string; displayName: string; fullPath: string }> = []
-          for (const ds of pageDataSources) {
-            const fields = getDataSourceFields(pageDataSources, ds.id)
+          for (const ds of effectiveDataSources) {
+            const fields = getDataSourceFields(effectiveDataSources, ds.id)
             for (const field of fields) {
               dsFieldOptions.push({
                 dataSourceId: ds.id,

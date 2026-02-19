@@ -55,6 +55,10 @@ export function generateTSX(ir: IRPage): string {
     if (v.type === 'any[]') {
       return `  const [${v.name}, set${capitalizedName}] = useState<any[]>([])`
     }
+    // Object type (single item from sampleData)
+    if (v.defaultValue !== null && typeof v.defaultValue === 'object') {
+      return `  const [${v.name}, set${capitalizedName}] = useState<any>(${JSON.stringify(v.defaultValue, null, 2).split('\n').map((line, i) => i === 0 ? line : '  ' + line).join('\n')})`
+    }
     // Form states with primitive types
     const defaultVal = v.defaultValue !== undefined
       ? (typeof v.defaultValue === 'string' ? `'${v.defaultValue}'` : v.defaultValue)

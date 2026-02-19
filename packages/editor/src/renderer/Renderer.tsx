@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ComponentNode } from '@forgestudio/protocol'
+import { getEffectiveDataSources } from '@forgestudio/protocol'
 import { EditWrapper } from './EditWrapper'
 import { evaluate, hasExpression, type ExpressionContext } from '@forgestudio/data-binding'
 import { useEditorStore } from '../store'
@@ -297,8 +298,12 @@ function renderComponent(node: ComponentNode, context?: ExpressionContext): Reac
 }
 
 export function NodeRenderer({ node, context }: { node: ComponentNode; context?: ExpressionContext }) {
-  const getCurrentPage = useEditorStore((s) => s.getCurrentPage)
-  const currentPage = getCurrentPage()
+  const schema = useEditorStore((s) => s.schema)
+  const currentPageId = useEditorStore((s) => s.currentPageId)
+  const currentPage = currentPageId ? schema.pages?.find(p => p.id === currentPageId) ?? null : null
+
+  // Get effective data sources (page-level + referenced globals)
+  const effectiveDataSources = currentPageId ? getEffectiveDataSources(schema, currentPageId) : []
 
   // Build $state context from formStates (M4: use page-level)
   const stateContext: Record<string, any> = {}
@@ -311,8 +316,7 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
   // In real app, these come from URL query params
   // Dynamically detect required params from data sources
   const paramContext: Record<string, any> = {}
-  const pageDataSources = currentPage?.dataSources ?? []
-  for (const ds of pageDataSources) {
+  for (const ds of effectiveDataSources) {
     const url = ds.options?.url || ''
     const paramMatches = url.matchAll(/\{\{\$param\.(\w+)\}\}/g)
     for (const match of paramMatches) {
@@ -369,10 +373,9 @@ export function NodeRenderer({ node, context }: { node: ComponentNode; context?:
     }
   }
 
-  // Handle loop rendering (M4: use page-level dataSources)
+  // Handle loop rendering (M4: use effective dataSources including globals)
   if (node.loop) {
-    const pageDataSources = currentPage?.dataSources ?? []
-    const dataSource = pageDataSources.find((ds) => ds.id === node.loop?.dataSourceId)
+    const dataSource = effectiveDataSources.find((ds) => ds.id === node.loop?.dataSourceId)
     const sampleData = dataSource?.sampleData ?? []
     const items = sampleData.slice(0, 3) // Preview 3 items
 

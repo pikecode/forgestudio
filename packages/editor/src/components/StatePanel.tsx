@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
-import type { FSPSchema, FormStateDef } from '@forgestudio/protocol'
+import type { FormStateDef } from '@forgestudio/protocol'
 
 interface StatePanelProps {
-  schema: FSPSchema
+  formStates: FormStateDef[]
   addFormState: (id: string, fs: Omit<FormStateDef, 'id'>) => void
   updateFormState: (id: string, updates: Partial<FormStateDef>) => void
   removeFormState: (id: string) => void
 }
 
-export function StatePanel({ schema, addFormState, updateFormState, removeFormState }: StatePanelProps) {
+export function StatePanel({ formStates, addFormState, updateFormState, removeFormState }: StatePanelProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<{ id: string; type: string; defaultValue: any }>({
@@ -22,7 +22,7 @@ export function StatePanel({ schema, addFormState, updateFormState, removeFormSt
       alert('请输入变量名')
       return
     }
-    if (schema.formStates?.some(fs => fs.id === formData.id)) {
+    if (formStates.some(fs => fs.id === formData.id)) {
       alert('变量名已存在')
       return
     }
@@ -162,12 +162,12 @@ export function StatePanel({ schema, addFormState, updateFormState, removeFormSt
 
       {/* State List */}
       <div style={{ padding: '8px 12px' }}>
-        {(!schema.formStates || schema.formStates.length === 0) && !isAdding && (
+        {formStates.length === 0 && !isAdding && (
           <div style={{ fontSize: 12, color: '#999', padding: '16px 0', textAlign: 'center' }}>
             暂无状态变量
           </div>
         )}
-        {schema.formStates?.map((fs) => (
+        {formStates.map((fs) => (
           <div key={fs.id} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
             {editingId === fs.id ? (
               <>

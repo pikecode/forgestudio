@@ -4,6 +4,7 @@ import type { DataSourceDef } from '@forgestudio/protocol'
 import { analyzeRequiredParams } from '../utils/param-analyzer'
 import { extractListFromResponse, extractFieldsFromData } from '../utils/field-extractor'
 import { DATASOURCE_TEMPLATES, DataSourceTemplate } from '../datasource-templates'
+import { RightPanelTabs } from './RightPanelTabs'
 
 export function DataSourcePanel() {
   const schema = useEditorStore((s) => s.schema)
@@ -78,13 +79,17 @@ export function DataSourcePanel() {
   const handleSelectTemplate = (template: DataSourceTemplate) => {
     setSelectedTemplate(template)
     const config = DATASOURCE_TEMPLATES[template]
+    const sampleData = config.sampleDataGenerator()
+    // Extract fields from sample data so user doesn't need to test API
+    const responseFields = extractFieldsFromData(sampleData)
     setFormData(prev => ({
       ...prev,
       url: config.urlTemplate,
       method: config.method,
       dataType: config.dataType,
       autoFetch: true,
-      sampleData: config.sampleDataGenerator(),
+      sampleData,
+      responseFields,
     }))
   }
 
@@ -223,8 +228,8 @@ export function DataSourcePanel() {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'application/json'
-    input.onchange = (e: any) => {
-      const file = e.target?.files?.[0]
+    input.onchange = (e: Event) => {
+      const file = (e.target as HTMLInputElement)?.files?.[0]
       if (!file) return
       const reader = new FileReader()
       reader.onload = (event) => {
@@ -347,10 +352,13 @@ export function DataSourcePanel() {
         sampleData = []
       }
 
+      // 如果接口返回空数据，保留原有的 sampleData（如果有的话）
+      const finalSampleData = sampleData.length > 0 ? sampleData : (formData.sampleData.length > 0 ? formData.sampleData : [])
+
       setFormData(prev => ({
         ...prev,
         responseFields: fields,
-        sampleData
+        sampleData: finalSampleData
       }))
 
       const dataType = Array.isArray(data) ? '数组' : '单对象'
@@ -364,26 +372,7 @@ export function DataSourcePanel() {
 
   return (
     <div className="forge-editor-panel forge-editor-panel--right">
-      <div className="forge-editor-tabs">
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'props' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('props')}
-        >
-          属性
-        </button>
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'datasource' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('datasource')}
-        >
-          数据源
-        </button>
-        <button
-          className={`forge-editor-tab ${rightPanelTab === 'code' ? 'forge-editor-tab--active' : ''}`}
-          onClick={() => setRightPanelTab('code')}
-        >
-          代码
-        </button>
-      </div>
+      <RightPanelTabs activeTab={rightPanelTab} onTabChange={setRightPanelTab} />
       <div className="forge-editor-panel__title">数据源管理</div>
 
       {/* Current page indicator (M4) */}

@@ -511,8 +511,9 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (state.historyIndex <= 0) return state
         const newIndex = state.historyIndex - 1
         const entry = state.history[newIndex]
+        // Immer will handle immutability, no need for structuredClone
         return {
-          schema: structuredClone(entry.schema),
+          schema: entry.schema,
           currentPageId: entry.currentPageId,
           historyIndex: newIndex,
           selectedNodeId: null,
@@ -525,8 +526,9 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (state.historyIndex >= state.history.length - 1) return state
         const newIndex = state.historyIndex + 1
         const entry = state.history[newIndex]
+        // Immer will handle immutability, no need for structuredClone
         return {
-          schema: structuredClone(entry.schema),
+          schema: entry.schema,
           currentPageId: entry.currentPageId,
           historyIndex: newIndex,
           selectedNodeId: null,

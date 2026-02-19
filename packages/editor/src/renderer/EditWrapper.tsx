@@ -14,13 +14,6 @@ export function EditWrapper({ node, children }: EditWrapperProps) {
   const selectNode = useEditorStore((s) => s.selectNode)
   const isSelected = selectedNodeId === node.id
 
-  // Debug: log when selection changes
-  useEffect(() => {
-    if (isSelected) {
-      console.log('Component selected:', node.id, node.component)
-    }
-  }, [isSelected, node.id, node.component])
-
   // Check if this component can accept children
   const meta = getComponentMeta(node.component)
   const canAcceptChildren = meta?.allowChildren ?? false

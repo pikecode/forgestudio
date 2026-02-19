@@ -46,9 +46,7 @@ function TreeNode({ node, level, parentId, index }: TreeNodeProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    console.log('TreePanel: Clicking node', node.component, node.id)
     selectNode(node.id)
-    console.log('TreePanel: selectNode called with', node.id)
   }
 
   const toggleCollapse = (e: React.MouseEvent) => {

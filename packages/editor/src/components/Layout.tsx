@@ -28,17 +28,21 @@ function useRecoveryToast() {
 function isDescendant(root: any, nodeId: string, targetId: string): boolean {
   const findNode = (node: any, id: string): any => {
     if (node.id === id) return node
-    for (const child of node.children ?? []) {
-      const found = findNode(child, id)
-      if (found) return found
+    if (node.children) {
+      for (const child of node.children) {
+        const found = findNode(child, id)
+        if (found) return found
+      }
     }
     return null
   }
 
-  const checkDescendant = (node: any, target: string): boolean => {
-    if (node.id === target) return true
-    for (const child of node.children ?? []) {
-      if (checkDescendant(child, target)) return true
+  const checkDescendant = (node: any, targetId: string): boolean => {
+    if (node.id === targetId) return true
+    if (node.children) {
+      for (const child of node.children) {
+        if (checkDescendant(child, targetId)) return true
+      }
     }
     return false
   }
