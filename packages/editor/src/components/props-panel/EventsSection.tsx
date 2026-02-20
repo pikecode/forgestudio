@@ -3,6 +3,7 @@ import type { Action } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
 import { findNodeById } from '@forgestudio/protocol'
 import { useEditorStore } from '../../store'
+import { SubmitFormConfig } from './SubmitFormConfig'
 
 export function EventsSection() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
@@ -18,6 +19,9 @@ export function EventsSection() {
 
   const currentPage = getCurrentPage()
   const pageFormStates = currentPage?.formStates ?? []
+  const pageDataSources = currentPage?.dataSources ?? []
+  const globalDataSources = schema.globalDataSources ?? []
+  const allDataSources = [...pageDataSources, ...globalDataSources]
 
   const node = selectedNodeId ? findNodeById(schema.componentTree, selectedNodeId) : null
   if (!node) return null
@@ -49,9 +53,13 @@ export function EventsSection() {
       ? { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
       : {
           type: 'submitForm',
-          url: actionParams.url || '',
-          method: actionParams.method || 'POST',
-          fields: actionParams.fields || [],
+          // New data source approach
+          dataSourceId: actionParams.dataSourceId,
+          fieldMapping: actionParams.fieldMapping,
+          // Legacy approach (for backward compatibility)
+          url: actionParams.url,
+          method: actionParams.method,
+          fields: actionParams.fields,
           successMessage: actionParams.successMessage,
           errorMessage: actionParams.errorMessage,
         }
@@ -87,7 +95,11 @@ export function EventsSection() {
                       • {action.type === 'navigate' && `跳转: ${action.url}${action.params ? ` (参数: ${Object.keys(action.params).join(', ')})` : ''}`}
                       {action.type === 'showToast' && `提示: ${action.title}`}
                       {action.type === 'setState' && `设置状态: ${action.target} = ${action.value}`}
-                      {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields.length}个字段)`}
+                      {action.type === 'submitForm' && (
+                        action.dataSourceId
+                          ? `提交表单: 数据源 ${action.dataSourceId} (${Object.keys(action.fieldMapping || {}).length}个映射)`
+                          : `提交表单: ${action.method} ${action.url} (${(action.fields || []).length}个字段)`
+                      )}
                     </span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button
@@ -118,6 +130,8 @@ export function EventsSection() {
                             })
                           } else if (action.type === 'submitForm') {
                             setActionParams({
+                              dataSourceId: action.dataSourceId,
+                              fieldMapping: action.fieldMapping,
                               url: action.url,
                               method: action.method,
                               fields: action.fields,
@@ -329,54 +343,12 @@ function ActionEditor({
       )}
 
       {actionType === 'submitForm' && (
-        <>
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle}>提交地址</label>
-            <input type="text" value={actionParams.url || ''} onChange={(e) => setActionParams({ ...actionParams, url: e.target.value })} placeholder="https://api.example.com/submit" style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle}>请求方法</label>
-            <select value={actionParams.method || 'POST'} onChange={(e) => setActionParams({ ...actionParams, method: e.target.value })} style={inputStyle}>
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-            </select>
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle}>提交字段（多选）</label>
-            {pageFormStates.length > 0 ? (
-              <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid #d0d0d0', borderRadius: 4, padding: 4 }}>
-                {pageFormStates.map((fs: any) => (
-                  <label key={fs.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={(actionParams.fields || []).includes(fs.id)}
-                      onChange={(e) => {
-                        const fields = actionParams.fields || []
-                        setActionParams({
-                          ...actionParams,
-                          fields: e.target.checked ? [...fields, fs.id] : fields.filter((f: string) => f !== fs.id),
-                        })
-                      }}
-                    />
-                    {fs.id} ({fs.type})
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: '#999', padding: 8 }}>暂无可用的状态变量</div>
-            )}
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle}>成功提示</label>
-            <input type="text" value={actionParams.successMessage || ''} onChange={(e) => setActionParams({ ...actionParams, successMessage: e.target.value })} placeholder="提交成功" style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle}>失败提示</label>
-            <input type="text" value={actionParams.errorMessage || ''} onChange={(e) => setActionParams({ ...actionParams, errorMessage: e.target.value })} placeholder="提交失败" style={inputStyle} />
-          </div>
-        </>
+        <SubmitFormConfig
+          dataSources={allDataSources}
+          formStates={pageFormStates}
+          value={actionParams}
+          onChange={setActionParams}
+        />
       )}
 
       <div style={{ display: 'flex', gap: 6 }}>
