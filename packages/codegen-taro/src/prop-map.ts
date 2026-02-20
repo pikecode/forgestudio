@@ -6,7 +6,7 @@ const FIT_TO_MODE: Record<string, string> = {
 }
 
 // Internal props that should not be rendered to JSX
-const INTERNAL_PROPS = new Set(['dataSourceId', 'fieldMapping', 'content', 'text', 'name'])
+const INTERNAL_PROPS = new Set(['dataSourceId', 'fieldMapping', 'content', 'text'])
 
 export function mapProps(
   tag: string,
@@ -87,13 +87,6 @@ export function mapProps(
     }
     if (tag === 'Button' && key === 'size') {
       result['size'] = `"${String(val)}"`
-      continue
-    }
-    if (tag === 'Button' && key === 'formType') {
-      // Only add formType if it's not empty
-      if (val && val !== '') {
-        result['formType'] = `"${String(val)}"`
-      }
       continue
     }
 

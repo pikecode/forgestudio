@@ -81,7 +81,7 @@ export const ButtonMeta: ComponentMeta = {
   icon: 'mouse-pointer',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { text: '按钮', type: 'default', size: 'default', formType: '' },
+  defaultProps: { text: '按钮', type: 'default', size: 'default' },
   defaultStyles: {},
   supportedEvents: ['onClick'],
   propsSchema: [
@@ -107,17 +107,6 @@ export const ButtonMeta: ComponentMeta = {
         { label: '小', value: 'mini' },
       ],
     },
-    {
-      name: 'formType',
-      title: '表单类型',
-      type: 'enum',
-      default: '',
-      options: [
-        { label: '无', value: '' },
-        { label: '提交', value: 'submit' },
-        { label: '重置', value: 'reset' },
-      ],
-    },
   ],
 }
 
@@ -127,11 +116,10 @@ export const InputMeta: ComponentMeta = {
   icon: 'text-cursor',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', type: 'text', value: '', name: '' },
+  defaultProps: { placeholder: '请输入', type: 'text', value: '' },
   defaultStyles: {},
   supportedEvents: ['onChange'],
   propsSchema: [
-    { name: 'name', title: '字段名', type: 'string', default: '' },
     { name: 'value', title: '绑定值', type: 'string', default: '' },
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     {
@@ -235,7 +223,6 @@ export const FormMeta: ComponentMeta = {
   allowChildren: true,
   defaultProps: {},
   defaultStyles: { padding: 12 },
-  supportedEvents: ['onSubmit'],
   propsSchema: [],
 }
 
