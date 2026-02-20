@@ -233,12 +233,10 @@ export const FormMeta: ComponentMeta = {
   icon: 'file-text',
   category: 'data',
   allowChildren: true,
-  defaultProps: { dataSourceId: '' },
+  defaultProps: {},
   defaultStyles: { padding: 12 },
   supportedEvents: ['onSubmit'],
-  propsSchema: [
-    { name: 'dataSourceId', title: '提交数据源', type: 'string', default: '' },
-  ],
+  propsSchema: [],
 }
 
 export const SwiperMeta: ComponentMeta = {

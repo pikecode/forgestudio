@@ -1,5 +1,5 @@
 import type { ComponentNode, FSPSchema, Action, DataSourceDef, PageDef } from '@forgestudio/protocol'
-import { getEffectiveDataSources } from '@forgestudio/protocol'
+import { getEffectiveDataSources, findNodeById } from '@forgestudio/protocol'
 import type {
   IRProject,
   IRPage,
@@ -442,10 +442,11 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
             const dataFields: string[] = []
             if (dataSource.requestParams) {
               for (const param of dataSource.requestParams) {
-                const mappedField = action.fieldMapping[param.name]
-                if (mappedField) {
-                  // Use mapped form field
-                  dataFields.push(`      ${param.name}: ${mappedField}`)
+                const mappedInputId = action.fieldMapping[param.name]
+                if (mappedInputId) {
+                  // Resolve input component ID to state variable name
+                  const stateName = submitFormInputMap.get(mappedInputId) || mappedInputId
+                  dataFields.push(`      ${param.name}: ${stateName}`)
                 } else if (param.defaultValue !== undefined) {
                   // Use default value
                   const defaultVal = typeof param.defaultValue === 'string'
@@ -457,8 +458,7 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
             }
 
             const dataObj = dataFields.join(',\n')
-            return `e.preventDefault()
-    Taro.request({
+            return `Taro.request({
       url: '${dataSource.options.url}',
       method: '${dataSource.options.method}',
       data: {
@@ -469,7 +469,7 @@ ${dataObj}
         Taro.showToast({ title: '${action.successMessage || '提交成功'}', icon: 'success' })
       })
       .catch((err) => {
-        console.error('Form submission failed:', err)
+        console.error('Submit failed:', err)
         Taro.showToast({ title: '${action.errorMessage || '提交失败'}', icon: 'error' })
       })`
           }
@@ -506,8 +506,7 @@ ${dataObj}
   // Check if handler needs event parameter (e.g., onChange with e.detail.value)
   function needsEventParam(actions: Action[]): boolean {
     return actions.some(action =>
-      (action.type === 'setState' && action.value.includes('e.detail')) ||
-      action.type === 'submitForm'
+      (action.type === 'setState' && action.value.includes('e.detail'))
     )
   }
 
@@ -532,31 +531,59 @@ ${dataObj}
     })
   }
 
-  // Helper function to find parent Form with fieldMapping
-  function findParentFormMapping(inputId: string, rootNode: ComponentNode): { formNode: ComponentNode; mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> } | null {
-    function search(node: ComponentNode): { formNode: ComponentNode; mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> } | null {
-      if (node.component === 'Form' && node.props.dataSourceId && node.props.fieldMapping) {
-        const fieldMapping = node.props.fieldMapping as Record<string, string>
-        // Check if this input is mapped in this form
-        for (const [paramName, mappedInputId] of Object.entries(fieldMapping)) {
-          if (mappedInputId === inputId) {
-            // Found! Return the form and its mapping
-            const stateName = `input_${inputId.replace(/[^a-zA-Z0-9]/g, '_')}`
-            return {
-              formNode: node,
-              mappedFields: [{ paramName, stateName, inputId }]
+  // Pre-pass: collect all submitForm field mappings from Button actions
+  // Maps inputComponentId -> state variable name
+  const submitFormInputMap = new Map<string, string>()
+
+  function collectSubmitFormMappings(node: ComponentNode) {
+    if (node.events) {
+      for (const actions of Object.values(node.events)) {
+        for (const action of actions) {
+          if (action.type === 'submitForm' && action.dataSourceId && action.fieldMapping) {
+            for (const [, inputId] of Object.entries(action.fieldMapping)) {
+              if (!submitFormInputMap.has(inputId)) {
+                // Check if the input already has a state binding via onChange -> setState
+                const inputNode = findNodeById(pageDef.componentTree, inputId)
+                if (inputNode) {
+                  const existingBinding = inputNode.events?.onChange?.find(
+                    (a: Action) => a.type === 'setState'
+                  )
+                  if (existingBinding && existingBinding.type === 'setState') {
+                    submitFormInputMap.set(inputId, existingBinding.target)
+                  } else {
+                    // Auto-create state variable name
+                    const stateName = `input_${inputId.replace(/[^a-zA-Z0-9]/g, '_')}`
+                    submitFormInputMap.set(inputId, stateName)
+                  }
+                }
+              }
             }
           }
         }
       }
-      // Search children
-      for (const child of node.children ?? []) {
-        const result = search(child)
-        if (result) return result
-      }
-      return null
     }
-    return search(rootNode)
+    for (const child of node.children ?? []) {
+      collectSubmitFormMappings(child)
+    }
+  }
+
+  collectSubmitFormMappings(pageDef.componentTree)
+
+  // Create state variables for auto-bound inputs (those without existing bindings)
+  for (const [inputId, stateName] of submitFormInputMap) {
+    const inputNode = findNodeById(pageDef.componentTree, inputId)
+    if (!inputNode) continue
+    const existingBinding = inputNode.events?.onChange?.find(
+      (a: Action) => a.type === 'setState'
+    )
+    // Only create state var if the input doesn't already have a binding
+    if (!existingBinding && !stateVars.find(sv => sv.name === stateName)) {
+      stateVars.push({
+        name: stateName,
+        type: 'string',
+        defaultValue: ''
+      })
+    }
   }
 
   function transformNode(node: ComponentNode): IRRenderNode | null {
@@ -601,195 +628,53 @@ ${dataObj}
       irProps[key] = { type: 'literal', value: sanitizedVal }
     }
 
-    // Auto-bind Input/Textarea if mapped in a parent Form
+    // Auto-bind Input/Textarea if referenced in a submitForm action (Button-based approach)
     if (node.component === 'Input' || node.component === 'Textarea') {
-      const formMapping = findParentFormMapping(node.id, pageDef.componentTree)
+      const mappedStateName = submitFormInputMap.get(node.id)
 
-      if (formMapping) {
-        // This input is mapped in a Form
-        const { stateName } = formMapping.mappedFields[0]
-
-        // Auto-bind value if not already set
+      if (mappedStateName && !node.events?.onChange) {
+        // This input is mapped in a Button's submitForm action and has no explicit binding
+        // Auto-bind value
         if (!node.props.value || node.props.value === '') {
-          irProps['value'] = { type: 'literal', value: `{{${stateName}}}` }
+          irProps['value'] = { type: 'literal', value: `{{${mappedStateName}}}` }
         }
 
-        // Auto-generate onChange handler if not already set
-        if (!node.events?.onChange) {
-          handlerCounter++
-          const handlerName = `handleOnChange${handlerCounter}`
-          const capitalizedName = stateName.charAt(0).toUpperCase() + stateName.slice(1)
-          const handlerBody = `set${capitalizedName}(e.detail.value)`
-
-          handlers.push({
-            name: handlerName,
-            params: 'e',
-            body: handlerBody,
-          })
-
-          irProps['onChange'] = {
-            type: 'identifier',
-            name: handlerName,
-          }
-        }
-      } else if (node.props.name) {
+        // Auto-generate onChange handler
+        handlerCounter++
+        const handlerName = `handleOnChange${handlerCounter}`
+        const capitalizedName = mappedStateName.charAt(0).toUpperCase() + mappedStateName.slice(1)
+        handlers.push({
+          name: handlerName,
+          params: 'e',
+          body: `set${capitalizedName}(e.detail.value)`,
+        })
+        irProps['onChange'] = { type: 'identifier', name: handlerName }
+      } else if (!mappedStateName && node.props.name) {
         // Fallback: old behavior with name property
         let fieldName = String(node.props.name).trim()
-
-        // Extract field name from expressions like {{$ds.xxx.fieldName}} or {{fieldName}}
         if (fieldName.startsWith('{{') && fieldName.endsWith('}}')) {
           fieldName = fieldName.slice(2, -2).trim()
         }
-
-        // Extract the last part of dotted expressions (e.g., $ds.xxx.title -> title)
         if (fieldName.includes('.')) {
           const parts = fieldName.split('.')
           fieldName = parts[parts.length - 1]
         }
+        fieldName = fieldName.replace(/^\$/, '').replace(/[^\w]/g, '_')
 
-        // Remove any remaining $ prefix
-        fieldName = fieldName.replace(/^\$/, '')
-
-        // Ensure it's a valid identifier (remove non-alphanumeric except underscore)
-        fieldName = fieldName.replace(/[^\w]/g, '_')
-
-        // Skip if fieldName is empty after sanitization
         if (fieldName) {
-          // Create state variable if it doesn't exist
           const existingState = pageFormStates.find(fs => fs.id === fieldName)
           if (!existingState && !stateVars.find(sv => sv.name === fieldName)) {
-            stateVars.push({
-              name: fieldName,
-              type: 'string',
-              defaultValue: ''
-            })
+            stateVars.push({ name: fieldName, type: 'string', defaultValue: '' })
           }
-
-          // Auto-bind value if not already set
           if (!node.props.value || node.props.value === '') {
             irProps['value'] = { type: 'literal', value: `{{${fieldName}}}` }
           }
-
-          // Auto-generate onChange handler if not already set
           if (!node.events?.onChange) {
             handlerCounter++
             const handlerName = `handleOnChange${handlerCounter}`
             const capitalizedName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
-            const handlerBody = `set${capitalizedName}(e.detail.value)`
-
-            handlers.push({
-              name: handlerName,
-              params: 'e',
-              body: handlerBody,
-            })
-
-            irProps['onChange'] = {
-              type: 'identifier',
-              name: handlerName,
-            }
-          }
-        }
-      }
-    }
-
-    // Auto-generate Form submission handler if Form has dataSourceId
-    if (node.component === 'Form' && node.props.dataSourceId) {
-      const dataSourceId = String(node.props.dataSourceId)
-      const dataSource = pageDataSources.find(ds => ds.id === dataSourceId)
-      const fieldMapping = node.props.fieldMapping as Record<string, string> | undefined
-
-      if (dataSource && fieldMapping && Object.keys(fieldMapping).length > 0) {
-        // Find all Input/Textarea children
-        const findAllInputs = (n: ComponentNode): ComponentNode[] => {
-          let inputs: ComponentNode[] = []
-          if (n.component === 'Input' || n.component === 'Textarea') {
-            inputs.push(n)
-          }
-          for (const child of n.children ?? []) {
-            inputs = inputs.concat(findAllInputs(child))
-          }
-          return inputs
-        }
-
-        const allInputs = findAllInputs(node)
-        const inputsById = new Map(allInputs.map(input => [input.id, input]))
-
-        // Process field mapping to create state variables and data fields
-        const mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> = []
-
-        for (const [paramName, inputId] of Object.entries(fieldMapping)) {
-          const input = inputsById.get(inputId)
-          if (input) {
-            // Generate state variable name from input ID
-            const stateName = `input_${inputId.replace(/[^a-zA-Z0-9]/g, '_')}`
-
-            // Create state variable
-            if (!stateVars.find(sv => sv.name === stateName)) {
-              stateVars.push({
-                name: stateName,
-                type: 'string',
-                defaultValue: ''
-              })
-            }
-
-            mappedFields.push({ paramName, stateName, inputId })
-
-            // Auto-generate onChange handler for this input if not already set
-            if (!input.events?.onChange) {
-              handlerCounter++
-              const handlerName = `handleOnChange${handlerCounter}`
-              const capitalizedName = stateName.charAt(0).toUpperCase() + stateName.slice(1)
-              const handlerBody = `set${capitalizedName}(e.detail.value)`
-
-              handlers.push({
-                name: handlerName,
-                params: 'e',
-                body: handlerBody,
-              })
-
-              // We need to mark this input to add onChange handler
-              // This will be handled when we transform the input node
-              // For now, we'll store it in a way that the input transformation can access
-            }
-          }
-        }
-
-        if (mappedFields.length > 0) {
-          // Build data object for submission
-          const dataFields: string[] = []
-          for (const field of mappedFields) {
-            dataFields.push(`      ${field.paramName}: ${field.stateName}`)
-          }
-
-          const dataObj = dataFields.join(',\n')
-          const handlerBody = `e.preventDefault()
-    Taro.request({
-      url: '${dataSource.options.url}',
-      method: '${dataSource.options.method || 'POST'}',
-      data: {
-${dataObj}
-      }
-    })
-      .then(() => {
-        Taro.showToast({ title: '提交成功', icon: 'success' })
-      })
-      .catch((err) => {
-        console.error('Form submission failed:', err)
-        Taro.showToast({ title: '提交失败', icon: 'error' })
-      })`
-
-          handlerCounter++
-          const handlerName = `handleOnSubmit${handlerCounter}`
-          handlers.push({
-            name: handlerName,
-            params: 'e',
-            body: handlerBody,
-          })
-
-          // Add onSubmit handler to Form props
-          irProps['onSubmit'] = {
-            type: 'identifier',
-            name: handlerName,
+            handlers.push({ name: handlerName, params: 'e', body: `set${capitalizedName}(e.detail.value)` })
+            irProps['onChange'] = { type: 'identifier', name: handlerName }
           }
         }
       }

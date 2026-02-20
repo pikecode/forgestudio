@@ -3,7 +3,6 @@ import type { Action } from '@forgestudio/protocol'
 import { findNodeById } from '@forgestudio/protocol'
 import { useEditorStore } from '../../store'
 import { StatePanel } from '../StatePanel'
-import { FormConfigSection } from './FormConfigSection'
 
 export function DataBindingSection() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
@@ -24,7 +23,6 @@ export function DataBindingSection() {
   const node = selectedNodeId ? findNodeById(schema.componentTree, selectedNodeId) : null
   if (!node) return null
 
-  const isForm = node.component === 'Form'
   const isBindable = node.component === 'Input' || node.component === 'Textarea' || node.component === 'Switch'
 
   // Sync local input with node's bound state variable
@@ -58,9 +56,6 @@ export function DataBindingSection() {
 
   return (
     <>
-      {/* Form Configuration */}
-      {isForm && <FormConfigSection formNode={node} />}
-
       {/* Data Binding for Input/Textarea/Switch */}
       {isBindable && (
         <>

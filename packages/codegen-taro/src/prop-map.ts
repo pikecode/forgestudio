@@ -6,7 +6,7 @@ const FIT_TO_MODE: Record<string, string> = {
 }
 
 // Internal props that should not be rendered to JSX
-const INTERNAL_PROPS = new Set(['dataSourceId', 'content', 'text'])
+const INTERNAL_PROPS = new Set(['dataSourceId', 'fieldMapping', 'content', 'text', 'name'])
 
 export function mapProps(
   tag: string,
