@@ -107,9 +107,6 @@ export function DataSourceTester({ url, method, headers, body, onTestSuccess }: 
       }
 
       onTestSuccess(fields, sampleData)
-
-      const dataType = Array.isArray(data) ? '数组' : '单对象'
-      alert(`✅ 成功获取${dataType}数据\n检测到 ${fields.length} 个字段：${fields.map(f => f.name).join(', ')}`)
     } catch (e) {
       alert('接口请求失败: ' + (e as Error).message)
     } finally {
