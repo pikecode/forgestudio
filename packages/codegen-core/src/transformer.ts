@@ -429,12 +429,38 @@ function transformPageToIR(schema: FSPSchema, pageDef: PageDef): IRPage {
 
           return `set${action.target.charAt(0).toUpperCase() + action.target.slice(1)}(${valueExpr})`
         }
-        case 'submitForm':
-          const dataObj = action.fields.map(f => `      ${f}`).join(',\n')
-          return `e.preventDefault()
+        case 'submitForm': {
+          // New data source approach
+          if (action.dataSourceId && action.fieldMapping) {
+            const dataSource = pageDataSources.find(ds => ds.id === action.dataSourceId)
+            if (!dataSource) {
+              console.warn(`Data source ${action.dataSourceId} not found`)
+              return ''
+            }
+
+            // Build data object from field mapping
+            const dataFields: string[] = []
+            if (dataSource.requestParams) {
+              for (const param of dataSource.requestParams) {
+                const mappedField = action.fieldMapping[param.name]
+                if (mappedField) {
+                  // Use mapped form field
+                  dataFields.push(`      ${param.name}: ${mappedField}`)
+                } else if (param.defaultValue !== undefined) {
+                  // Use default value
+                  const defaultVal = typeof param.defaultValue === 'string'
+                    ? `'${param.defaultValue}'`
+                    : param.defaultValue
+                  dataFields.push(`      ${param.name}: ${defaultVal}`)
+                }
+              }
+            }
+
+            const dataObj = dataFields.join(',\n')
+            return `e.preventDefault()
     Taro.request({
-      url: '${action.url}',
-      method: '${action.method}',
+      url: '${dataSource.options.url}',
+      method: '${dataSource.options.method}',
       data: {
 ${dataObj}
       }
@@ -446,6 +472,30 @@ ${dataObj}
         console.error('Form submission failed:', err)
         Taro.showToast({ title: '${action.errorMessage || '提交失败'}', icon: 'error' })
       })`
+          }
+
+          // Legacy approach (backward compatibility)
+          if (action.url && action.fields) {
+            const dataObj = action.fields.map(f => `      ${f}`).join(',\n')
+            return `e.preventDefault()
+    Taro.request({
+      url: '${action.url}',
+      method: '${action.method || 'POST'}',
+      data: {
+${dataObj}
+      }
+    })
+      .then(() => {
+        Taro.showToast({ title: '${action.successMessage || '提交成功'}', icon: 'success' })
+      })
+      .catch((err) => {
+        console.error('Form submission failed:', err)
+        Taro.showToast({ title: '${action.errorMessage || '提交失败'}', icon: 'error' })
+      })`
+          }
+
+          return ''
+        }
         default:
           return ''
       }
