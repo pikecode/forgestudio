@@ -19,7 +19,12 @@ export function mapProps(
 
     // Handle identifier type (for event handlers)
     if (expr.type === 'identifier') {
-      result[key] = `{${expr.name}}`
+      // Map onChange to onInput for Input and Textarea in Taro
+      let eventName = key
+      if ((tag === 'Input' || tag === 'Textarea') && key === 'onChange') {
+        eventName = 'onInput'
+      }
+      result[eventName] = `{${expr.name}}`
       continue
     }
 

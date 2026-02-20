@@ -103,70 +103,102 @@ export function FormConfigSection({ formNode }: FormConfigSectionProps) {
       </div>
 
       {/* Field Mapping Section */}
-      {selectedDataSource && selectedDataSource.requestParams && selectedDataSource.requestParams.length > 0 && (
+      {selectedDataSource && (
         <>
-          <div className="forge-editor-panel__section">字段映射</div>
-          <div style={{ padding: '8px 12px' }}>
-            {formInputs.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
-                表单中还没有输入组件，请先添加 Input 或 Textarea 组件
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                将 API 参数映射到表单输入组件：
-              </div>
-            )}
-
-            {selectedDataSource.requestParams.map((param) => {
-              const mappedInputId = fieldMapping[param.name] || ''
-              return (
-                <div
-                  key={param.name}
-                  style={{
-                    marginBottom: 12,
-                    padding: '8px',
-                    backgroundColor: '#f5f5f5',
-                    borderRadius: 4,
-                    borderLeft: param.required ? '3px solid #ff4d4f' : '3px solid #d0d0d0',
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                    {param.name}
-                    {param.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+          {selectedDataSource.requestParams && selectedDataSource.requestParams.length > 0 ? (
+            <>
+              <div className="forge-editor-panel__section">字段映射</div>
+              <div style={{ padding: '8px 12px' }}>
+                {formInputs.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
+                    表单中还没有输入组件，请先添加 Input 或 Textarea 组件
                   </div>
-                  {param.description && (
-                    <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>
-                      {param.description}
-                    </div>
-                  )}
-                  <select
-                    value={mappedInputId}
-                    onChange={(e) => handleFieldMappingChange(param.name, e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '4px 8px',
-                      fontSize: 12,
-                      border: '1px solid #d0d0d0',
-                      borderRadius: 4,
-                      backgroundColor: '#fff',
-                    }}
-                    disabled={formInputs.length === 0}
-                  >
-                    <option value="">-- 选择输入组件 --</option>
-                    {formInputs.map((input) => (
-                      <option key={input.id} value={input.id}>
-                        {getInputLabel(input)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })}
+                ) : (
+                  <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                    将 API 参数映射到表单输入组件：
+                  </div>
+                )}
 
-            <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
-              💡 必填参数用红色标记，请确保所有必填参数都已映射
-            </div>
-          </div>
+                {selectedDataSource.requestParams.map((param) => {
+                  const mappedInputId = fieldMapping[param.name] || ''
+                  return (
+                    <div
+                      key={param.name}
+                      style={{
+                        marginBottom: 12,
+                        padding: '8px',
+                        backgroundColor: '#f5f5f5',
+                        borderRadius: 4,
+                        borderLeft: param.required ? '3px solid #ff4d4f' : '3px solid #d0d0d0',
+                      }}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                        {param.name}
+                        {param.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                      </div>
+                      {param.description && (
+                        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>
+                          {param.description}
+                        </div>
+                      )}
+                      <select
+                        value={mappedInputId}
+                        onChange={(e) => handleFieldMappingChange(param.name, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '4px 8px',
+                          fontSize: 12,
+                          border: '1px solid #d0d0d0',
+                          borderRadius: 4,
+                          backgroundColor: '#fff',
+                        }}
+                        disabled={formInputs.length === 0}
+                      >
+                        <option value="">-- 选择输入组件 --</option>
+                        {formInputs.map((input) => (
+                          <option key={input.id} value={input.id}>
+                            {getInputLabel(input)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })}
+
+                <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                  💡 必填参数用红色标记，请确保所有必填参数都已映射
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="forge-editor-panel__section">字段映射</div>
+              <div style={{ padding: '8px 12px' }}>
+                <div style={{
+                  fontSize: 12,
+                  color: '#ff4d4f',
+                  backgroundColor: '#fff2f0',
+                  padding: '12px',
+                  borderRadius: 4,
+                  border: '1px solid #ffccc7',
+                  marginBottom: 8
+                }}>
+                  ⚠️ 该数据源尚未配置请求参数
+                </div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                  请按以下步骤配置：
+                </div>
+                <ol style={{ fontSize: 12, color: '#666', paddingLeft: 20, margin: 0 }}>
+                  <li style={{ marginBottom: 4 }}>切换到"数据源"标签页</li>
+                  <li style={{ marginBottom: 4 }}>编辑"{selectedDataSource.label || selectedDataSource.id}"数据源</li>
+                  <li style={{ marginBottom: 4 }}>确保"用途"选择为 mutation</li>
+                  <li style={{ marginBottom: 4 }}>展开"请求参数定义"折叠面板</li>
+                  <li style={{ marginBottom: 4 }}>点击"+ 添加参数"添加 API 参数</li>
+                  <li>保存后返回此处配置字段映射</li>
+                </ol>
+              </div>
+            </>
+          )}
         </>
       )}
 
