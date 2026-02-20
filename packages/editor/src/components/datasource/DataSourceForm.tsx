@@ -129,6 +129,21 @@ export function DataSourceForm({
           </select>
         </div>
 
+        {/* Data type (query only) */}
+        {!isMutation && (
+          <div style={{ marginBottom: 8 }}>
+            <label style={labelStyle}>返回类型</label>
+            <select
+              value={formData.dataType}
+              onChange={(e) => onFormDataChange({ dataType: e.target.value as 'array' | 'object' })}
+              style={inputStyle}
+            >
+              <option value="array">数组（列表）</option>
+              <option value="object">对象（详情）</option>
+            </select>
+          </div>
+        )}
+
         {/* Label */}
         <div style={{ marginBottom: 8 }}>
           <label style={labelStyle}>
