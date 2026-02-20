@@ -3,7 +3,6 @@ import type { Action } from '@forgestudio/protocol'
 import { getComponentMeta } from '@forgestudio/components'
 import { findNodeById } from '@forgestudio/protocol'
 import { useEditorStore } from '../../store'
-import { SubmitFormConfig } from './SubmitFormConfig'
 
 export function EventsSection() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
@@ -14,7 +13,7 @@ export function EventsSection() {
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
   const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
-  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm'>('showToast')
+  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState'>('showToast')
   const [actionParams, setActionParams] = useState<Record<string, any>>({})
 
   const currentPage = getCurrentPage()
@@ -49,20 +48,7 @@ export function EventsSection() {
         }
       : actionType === 'showToast'
       ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as 'success' | 'error' | 'loading' | 'none' | undefined }
-      : actionType === 'setState'
-      ? { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
-      : {
-          type: 'submitForm',
-          // New data source approach
-          dataSourceId: actionParams.dataSourceId,
-          fieldMapping: actionParams.fieldMapping,
-          // Legacy approach (for backward compatibility)
-          url: actionParams.url,
-          method: actionParams.method,
-          fields: actionParams.fields,
-          successMessage: actionParams.successMessage,
-          errorMessage: actionParams.errorMessage,
-        }
+      : { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
 
     // If editing, replace the action at the index; otherwise, append
     const updatedActions = editingActionIndex !== null
@@ -127,16 +113,6 @@ export function EventsSection() {
                             setActionParams({
                               target: action.target,
                               value: action.value,
-                            })
-                          } else if (action.type === 'submitForm') {
-                            setActionParams({
-                              dataSourceId: action.dataSourceId,
-                              fieldMapping: action.fieldMapping,
-                              url: action.url,
-                              method: action.method,
-                              fields: action.fields,
-                              successMessage: action.successMessage,
-                              errorMessage: action.errorMessage,
                             })
                           }
                         }}
@@ -213,12 +189,14 @@ function ActionEditor({
     <div style={{ marginTop: 8, padding: 8, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
       <div style={{ marginBottom: 6 }}>
         <label style={labelStyle}>动作类型</label>
-        <select value={actionType} onChange={(e) => { setActionType(e.target.value); setActionParams({}) }} style={inputStyle}>
+        <select value={actionType} onChange={(e) => { setActionType(e.target.value as any); setActionParams({}) }} style={inputStyle}>
           <option value="showToast">显示提示</option>
           <option value="navigate">页面跳转</option>
           <option value="setState">设置状态</option>
-          <option value="submitForm">提交表单</option>
         </select>
+        <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+          💡 表单提交请在 Form 组件的"数据"标签页配置
+        </div>
       </div>
 
       {actionType === 'showToast' && (
@@ -342,15 +320,6 @@ function ActionEditor({
             <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>字符串需加引号，如 '新值'</div>
           </div>
         </>
-      )}
-
-      {actionType === 'submitForm' && (
-        <SubmitFormConfig
-          dataSources={allDataSources}
-          formStates={pageFormStates}
-          value={actionParams}
-          onChange={setActionParams}
-        />
       )}
 
       <div style={{ display: 'flex', gap: 6 }}>
