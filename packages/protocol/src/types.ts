@@ -92,6 +92,16 @@ export interface FieldSchema {
   type: 'string' | 'number' | 'boolean' | 'object' | 'array'
 }
 
+/** Request parameter definition for API data sources */
+export interface RequestParamDef {
+  name: string          // Parameter name, e.g. "title", "body", "userId"
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array'
+  required: boolean
+  description?: string  // Parameter description
+  defaultValue?: any    // Default value
+  location: 'body' | 'query' | 'path'  // Parameter location
+}
+
 /** Data source definition (M1.3, M5: real API-driven) */
 export interface DataSourceDef {
   id: string
@@ -115,6 +125,8 @@ export interface DataSourceDef {
   mockData?: unknown
   /** Sample data cached from real API (for editor preview only, max 3 items) */
   sampleData?: unknown[]
+  /** Request parameters definition for structured API configuration */
+  requestParams?: RequestParamDef[]
   /** Fields extracted from API response */
   responseFields?: FieldSchema[]
   /** Dependencies: data sources that must be fetched before this one (M2) */
@@ -155,11 +167,20 @@ export interface SetStateAction {
 
 export interface SubmitFormAction {
   type: 'submitForm'
-  url: string  // API endpoint
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
-  fields: string[]  // state variable names to collect
+  /** Reference to a data source (new approach) or direct URL (legacy) */
+  dataSourceId?: string
+  /** Field mapping: request param name -> form state variable name */
+  fieldMapping?: Record<string, string>
+  /** @deprecated Use dataSourceId instead. Direct URL for legacy support */
+  url?: string
+  /** @deprecated Use dataSourceId instead. HTTP method for legacy support */
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  /** @deprecated Use fieldMapping instead. State variable names for legacy support */
+  fields?: string[]
   successMessage?: string
   errorMessage?: string
+  /** Actions to execute on success */
+  onSuccess?: Action[]
 }
 
 // ============================================================

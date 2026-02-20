@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useEditorStore } from '../store'
-import type { DataSourceDef, FieldSchema } from '@forgestudio/protocol'
+import type { DataSourceDef, FieldSchema, RequestParamDef } from '@forgestudio/protocol'
 import { analyzeRequiredParams } from '../utils/param-analyzer'
 import { RightPanelTabs } from './RightPanelTabs'
 import { DataSourceList, DataSourceForm, GlobalDataSourceSection } from './datasource'
@@ -32,6 +32,7 @@ export function DataSourcePanel() {
     autoFetch: true,
     dependsOn: [] as string[],
     pagination: undefined as { type: 'page' | 'cursor'; pageSize: number; pageParam?: string; sizeParam?: string } | undefined,
+    requestParams: [] as RequestParamDef[],
     responseFields: [] as FieldSchema[],
     sampleData: [] as unknown[],
   })
@@ -57,6 +58,7 @@ export function DataSourcePanel() {
       dependsOn: [],
       body: '',
       headers: {},
+      requestParams: [],
       responseFields: [],
       sampleData: [],
       pagination: undefined,
@@ -94,6 +96,7 @@ export function DataSourcePanel() {
         body: formData.body || undefined,
       },
       autoFetch: formData.autoFetch,
+      requestParams: formData.requestParams.length > 0 ? formData.requestParams : undefined,
       responseFields: formData.responseFields,
       sampleData: formData.sampleData,
       dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
@@ -129,6 +132,7 @@ export function DataSourcePanel() {
         body: formData.body || undefined,
       },
       autoFetch: formData.autoFetch,
+      requestParams: formData.requestParams.length > 0 ? formData.requestParams : undefined,
       responseFields: formData.responseFields,
       sampleData: formData.sampleData,
       dependsOn: formData.dependsOn.length > 0 ? formData.dependsOn : undefined,
@@ -156,6 +160,7 @@ export function DataSourcePanel() {
       dependsOn: ds.dependsOn || [],
       body: ds.options?.body || '',
       headers: ds.options?.headers || {},
+      requestParams: ds.requestParams || [],
       responseFields: ds.responseFields || [],
       sampleData: ds.sampleData || [],
       pagination: ds.pagination,

@@ -1,6 +1,7 @@
-import type { DataSourceDef, FieldSchema } from '@forgestudio/protocol'
+import type { DataSourceDef, FieldSchema, RequestParamDef } from '@forgestudio/protocol'
 import { DATASOURCE_TEMPLATES, DataSourceTemplate } from '../../datasource-templates'
 import { DataSourceTester } from './DataSourceTester'
+import { RequestParamsEditor } from './RequestParamsEditor'
 
 interface DataSourceFormData {
   purpose: 'query' | 'mutation'
@@ -13,6 +14,7 @@ interface DataSourceFormData {
   autoFetch: boolean
   dependsOn: string[]
   pagination?: { type: 'page' | 'cursor'; pageSize: number; pageParam?: string; sizeParam?: string }
+  requestParams: RequestParamDef[]
   responseFields: FieldSchema[]
   sampleData: unknown[]
 }
@@ -239,6 +241,14 @@ export function DataSourceForm({
               支持使用 {'{{'} 表达式 {'}}'}，如 {'{{'} $state.fieldName {'}}'}
             </div>
           </div>
+        )}
+
+        {/* Request Parameters Definition */}
+        {formData.purpose === 'mutation' && (
+          <RequestParamsEditor
+            params={formData.requestParams || []}
+            onChange={(params) => onFormDataChange({ requestParams: params })}
+          />
         )}
 
         {/* Request Headers */}
