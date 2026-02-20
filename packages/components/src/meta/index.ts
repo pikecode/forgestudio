@@ -116,11 +116,9 @@ export const InputMeta: ComponentMeta = {
   icon: 'text-cursor',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', type: 'text', value: '' },
+  defaultProps: { placeholder: '请输入', type: 'text' },
   defaultStyles: {},
-  supportedEvents: ['onChange'],
   propsSchema: [
-    { name: 'value', title: '绑定值', type: 'string', default: '' },
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     {
       name: 'type',
@@ -190,11 +188,9 @@ export const TextareaMeta: ComponentMeta = {
   icon: 'align-left',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', maxLength: 200, value: '' },
+  defaultProps: { placeholder: '请输入', maxLength: 200 },
   defaultStyles: {},
-  supportedEvents: ['onChange'],
   propsSchema: [
-    { name: 'value', title: '绑定值', type: 'string', default: '' },
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     { name: 'maxLength', title: '最大长度', type: 'number', default: 200 },
   ],

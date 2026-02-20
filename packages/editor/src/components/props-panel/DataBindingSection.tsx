@@ -23,7 +23,7 @@ export function DataBindingSection() {
   const node = selectedNodeId ? findNodeById(schema.componentTree, selectedNodeId) : null
   if (!node) return null
 
-  const isBindable = node.component === 'Input' || node.component === 'Textarea' || node.component === 'Switch'
+  const isSwitch = node.component === 'Switch'
 
   // Sync local input with node's bound state variable
   React.useEffect(() => {
@@ -38,7 +38,6 @@ export function DataBindingSection() {
     if (varName) {
       const action: Action = { type: 'setState', target: varName, value: 'e.detail.value' }
       updateNodeEvents(node.id, 'onChange', [action])
-      const isSwitch = node.component === 'Switch'
       const stateType = isSwitch ? 'boolean' : 'string'
       const defaultValue = isSwitch ? false : ''
       const bindProp = isSwitch ? 'checked' : 'value'
@@ -49,15 +48,14 @@ export function DataBindingSection() {
       updateNodeProps(node.id, { [bindProp]: `{{${varName}}}` })
     } else {
       updateNodeEvents(node.id, 'onChange', [])
-      const bindProp = node.component === 'Switch' ? 'checked' : 'value'
-      updateNodeProps(node.id, { [bindProp]: node.component === 'Switch' ? false : '' })
+      updateNodeProps(node.id, { checked: false })
     }
   }
 
   return (
     <>
-      {/* Data Binding for Input/Textarea/Switch */}
-      {isBindable && (
+      {/* Data Binding for Switch only */}
+      {isSwitch && (
         <>
           <div className="forge-editor-panel__section">数据绑定</div>
           <div style={{ padding: '8px 12px' }}>
@@ -66,7 +64,7 @@ export function DataBindingSection() {
             </label>
             <input
               type="text"
-              placeholder={node.component === 'Switch' ? '例如: isChecked' : '例如: inputValue'}
+              placeholder="例如: isChecked"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onBlur={handleBindVariable}
