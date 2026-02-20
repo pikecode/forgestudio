@@ -13,12 +13,20 @@ interface DataSourceTesterProps {
 export function DataSourceTester({ url, method, headers, body, onTestSuccess }: DataSourceTesterProps) {
   const [testing, setTesting] = useState(false)
   const [testParams, setTestParams] = useState<Record<string, string>>({})
+  const [testBody, setTestBody] = useState('')
 
   const handleTestApi = async () => {
     if (!url) {
       alert('请先填写 URL')
       return
     }
+
+    // For mutation methods, check if we need test body
+    if (method !== 'GET' && !testBody && body) {
+      alert('请填写测试请求体数据')
+      return
+    }
+
     setTesting(true)
     try {
       // 替换 URL 中的参数占位符 {{$param.xxx}}
@@ -46,13 +54,24 @@ export function DataSourceTester({ url, method, headers, body, onTestSuccess }: 
         }
       }
 
+      // Prepare request body
+      let requestBody: string | undefined
+      if (method !== 'GET') {
+        if (testBody) {
+          requestBody = testBody
+        } else if (body && !body.includes('{{')) {
+          // Use body template if it doesn't contain placeholders
+          requestBody = body
+        }
+      }
+
       const res = await fetch(requestUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
           ...headers,
         },
-        body: method !== 'GET' && body ? body : undefined
+        body: requestBody
       })
 
       if (!res.ok) {
@@ -114,6 +133,33 @@ export function DataSourceTester({ url, method, headers, body, onTestSuccess }: 
           {testing ? '测试中...' : '测试接口'}
         </button>
       </div>
+
+      {/* Test body input for mutation methods */}
+      {method !== 'GET' && (
+        <div style={{ marginTop: 8 }}>
+          <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>
+            测试请求体（JSON）
+          </label>
+          <textarea
+            value={testBody}
+            onChange={(e) => setTestBody(e.target.value)}
+            placeholder='{"title": "测试标题", "body": "测试内容", "userId": 1}'
+            rows={4}
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '1px solid #d0d0d0',
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: 'Monaco, monospace',
+              resize: 'vertical',
+            }}
+          />
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+            💡 填写用于测试的 JSON 数据，测试成功后会提取响应字段
+          </div>
+        </div>
+      )}
 
       {/* Test params input (if URL contains {{$param.xxx}}) */}
       {detectedParams.length > 0 && (
