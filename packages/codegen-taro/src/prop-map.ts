@@ -89,6 +89,13 @@ export function mapProps(
       result['size'] = `"${String(val)}"`
       continue
     }
+    if (tag === 'Button' && key === 'formType') {
+      // Only add formType if it's not empty
+      if (val && val !== '') {
+        result['formType'] = `"${String(val)}"`
+      }
+      continue
+    }
 
     // Switch-specific mappings
     if (tag === 'Switch' && key === 'checked') {

@@ -81,7 +81,7 @@ export const ButtonMeta: ComponentMeta = {
   icon: 'mouse-pointer',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { text: '按钮', type: 'default', size: 'default' },
+  defaultProps: { text: '按钮', type: 'default', size: 'default', formType: '' },
   defaultStyles: {},
   supportedEvents: ['onClick'],
   propsSchema: [
@@ -105,6 +105,17 @@ export const ButtonMeta: ComponentMeta = {
       options: [
         { label: '默认', value: 'default' },
         { label: '小', value: 'mini' },
+      ],
+    },
+    {
+      name: 'formType',
+      title: '表单类型',
+      type: 'enum',
+      default: '',
+      options: [
+        { label: '无', value: '' },
+        { label: '提交', value: 'submit' },
+        { label: '重置', value: 'reset' },
       ],
     },
   ],
