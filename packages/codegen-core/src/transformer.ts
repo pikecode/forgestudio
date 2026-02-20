@@ -532,6 +532,33 @@ ${dataObj}
     })
   }
 
+  // Helper function to find parent Form with fieldMapping
+  function findParentFormMapping(inputId: string, rootNode: ComponentNode): { formNode: ComponentNode; mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> } | null {
+    function search(node: ComponentNode): { formNode: ComponentNode; mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> } | null {
+      if (node.component === 'Form' && node.props.dataSourceId && node.props.fieldMapping) {
+        const fieldMapping = node.props.fieldMapping as Record<string, string>
+        // Check if this input is mapped in this form
+        for (const [paramName, mappedInputId] of Object.entries(fieldMapping)) {
+          if (mappedInputId === inputId) {
+            // Found! Return the form and its mapping
+            const stateName = `input_${inputId.replace(/[^a-zA-Z0-9]/g, '_')}`
+            return {
+              formNode: node,
+              mappedFields: [{ paramName, stateName, inputId }]
+            }
+          }
+        }
+      }
+      // Search children
+      for (const child of node.children ?? []) {
+        const result = search(child)
+        if (result) return result
+      }
+      return null
+    }
+    return search(rootNode)
+  }
+
   function transformNode(node: ComponentNode): IRRenderNode | null {
     // Collect styles into stylesheet
     const properties: Record<string, string> = {}
@@ -572,6 +599,200 @@ ${dataObj}
       // Sanitize expressions in prop values
       const sanitizedVal = typeof val === 'string' ? sanitizeExpression(val) : val
       irProps[key] = { type: 'literal', value: sanitizedVal }
+    }
+
+    // Auto-bind Input/Textarea if mapped in a parent Form
+    if (node.component === 'Input' || node.component === 'Textarea') {
+      const formMapping = findParentFormMapping(node.id, pageDef.componentTree)
+
+      if (formMapping) {
+        // This input is mapped in a Form
+        const { stateName } = formMapping.mappedFields[0]
+
+        // Auto-bind value if not already set
+        if (!node.props.value || node.props.value === '') {
+          irProps['value'] = { type: 'literal', value: `{{${stateName}}}` }
+        }
+
+        // Auto-generate onChange handler if not already set
+        if (!node.events?.onChange) {
+          handlerCounter++
+          const handlerName = `handleOnChange${handlerCounter}`
+          const capitalizedName = stateName.charAt(0).toUpperCase() + stateName.slice(1)
+          const handlerBody = `set${capitalizedName}(e.detail.value)`
+
+          handlers.push({
+            name: handlerName,
+            params: 'e',
+            body: handlerBody,
+          })
+
+          irProps['onChange'] = {
+            type: 'identifier',
+            name: handlerName,
+          }
+        }
+      } else if (node.props.name) {
+        // Fallback: old behavior with name property
+        let fieldName = String(node.props.name).trim()
+
+        // Extract field name from expressions like {{$ds.xxx.fieldName}} or {{fieldName}}
+        if (fieldName.startsWith('{{') && fieldName.endsWith('}}')) {
+          fieldName = fieldName.slice(2, -2).trim()
+        }
+
+        // Extract the last part of dotted expressions (e.g., $ds.xxx.title -> title)
+        if (fieldName.includes('.')) {
+          const parts = fieldName.split('.')
+          fieldName = parts[parts.length - 1]
+        }
+
+        // Remove any remaining $ prefix
+        fieldName = fieldName.replace(/^\$/, '')
+
+        // Ensure it's a valid identifier (remove non-alphanumeric except underscore)
+        fieldName = fieldName.replace(/[^\w]/g, '_')
+
+        // Skip if fieldName is empty after sanitization
+        if (fieldName) {
+          // Create state variable if it doesn't exist
+          const existingState = pageFormStates.find(fs => fs.id === fieldName)
+          if (!existingState && !stateVars.find(sv => sv.name === fieldName)) {
+            stateVars.push({
+              name: fieldName,
+              type: 'string',
+              defaultValue: ''
+            })
+          }
+
+          // Auto-bind value if not already set
+          if (!node.props.value || node.props.value === '') {
+            irProps['value'] = { type: 'literal', value: `{{${fieldName}}}` }
+          }
+
+          // Auto-generate onChange handler if not already set
+          if (!node.events?.onChange) {
+            handlerCounter++
+            const handlerName = `handleOnChange${handlerCounter}`
+            const capitalizedName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
+            const handlerBody = `set${capitalizedName}(e.detail.value)`
+
+            handlers.push({
+              name: handlerName,
+              params: 'e',
+              body: handlerBody,
+            })
+
+            irProps['onChange'] = {
+              type: 'identifier',
+              name: handlerName,
+            }
+          }
+        }
+      }
+    }
+
+    // Auto-generate Form submission handler if Form has dataSourceId
+    if (node.component === 'Form' && node.props.dataSourceId) {
+      const dataSourceId = String(node.props.dataSourceId)
+      const dataSource = pageDataSources.find(ds => ds.id === dataSourceId)
+      const fieldMapping = node.props.fieldMapping as Record<string, string> | undefined
+
+      if (dataSource && fieldMapping && Object.keys(fieldMapping).length > 0) {
+        // Find all Input/Textarea children
+        const findAllInputs = (n: ComponentNode): ComponentNode[] => {
+          let inputs: ComponentNode[] = []
+          if (n.component === 'Input' || n.component === 'Textarea') {
+            inputs.push(n)
+          }
+          for (const child of n.children ?? []) {
+            inputs = inputs.concat(findAllInputs(child))
+          }
+          return inputs
+        }
+
+        const allInputs = findAllInputs(node)
+        const inputsById = new Map(allInputs.map(input => [input.id, input]))
+
+        // Process field mapping to create state variables and data fields
+        const mappedFields: Array<{ paramName: string; stateName: string; inputId: string }> = []
+
+        for (const [paramName, inputId] of Object.entries(fieldMapping)) {
+          const input = inputsById.get(inputId)
+          if (input) {
+            // Generate state variable name from input ID
+            const stateName = `input_${inputId.replace(/[^a-zA-Z0-9]/g, '_')}`
+
+            // Create state variable
+            if (!stateVars.find(sv => sv.name === stateName)) {
+              stateVars.push({
+                name: stateName,
+                type: 'string',
+                defaultValue: ''
+              })
+            }
+
+            mappedFields.push({ paramName, stateName, inputId })
+
+            // Auto-generate onChange handler for this input if not already set
+            if (!input.events?.onChange) {
+              handlerCounter++
+              const handlerName = `handleOnChange${handlerCounter}`
+              const capitalizedName = stateName.charAt(0).toUpperCase() + stateName.slice(1)
+              const handlerBody = `set${capitalizedName}(e.detail.value)`
+
+              handlers.push({
+                name: handlerName,
+                params: 'e',
+                body: handlerBody,
+              })
+
+              // We need to mark this input to add onChange handler
+              // This will be handled when we transform the input node
+              // For now, we'll store it in a way that the input transformation can access
+            }
+          }
+        }
+
+        if (mappedFields.length > 0) {
+          // Build data object for submission
+          const dataFields: string[] = []
+          for (const field of mappedFields) {
+            dataFields.push(`      ${field.paramName}: ${field.stateName}`)
+          }
+
+          const dataObj = dataFields.join(',\n')
+          const handlerBody = `e.preventDefault()
+    Taro.request({
+      url: '${dataSource.options.url}',
+      method: '${dataSource.options.method || 'POST'}',
+      data: {
+${dataObj}
+      }
+    })
+      .then(() => {
+        Taro.showToast({ title: '提交成功', icon: 'success' })
+      })
+      .catch((err) => {
+        console.error('Form submission failed:', err)
+        Taro.showToast({ title: '提交失败', icon: 'error' })
+      })`
+
+          handlerCounter++
+          const handlerName = `handleOnSubmit${handlerCounter}`
+          handlers.push({
+            name: handlerName,
+            params: 'e',
+            body: handlerBody,
+          })
+
+          // Add onSubmit handler to Form props
+          irProps['onSubmit'] = {
+            type: 'identifier',
+            name: handlerName,
+          }
+        }
+      }
     }
 
     // Handle events - generate handlers and add to props

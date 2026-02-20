@@ -37,11 +37,41 @@ export function mapProps(
 
     // Input-specific mappings
     if (tag === 'Input' && key === 'placeholder') {
-      result['placeholder'] = `"${String(val)}"`
+      // Check if it's an expression
+      if (String(val).startsWith('{{') && String(val).endsWith('}}')) {
+        const expr = String(val).slice(2, -2).trim()
+          .replace(/\$state\.(\w+)/g, '$1')
+          .replace(/\$item\.(\w+)/g, 'item.$1')
+          .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+          .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
+          .replace(/^\$/, '')
+        result['placeholder'] = `{${expr}}`
+      } else {
+        result['placeholder'] = `"${String(val)}"`
+      }
       continue
     }
     if (tag === 'Input' && key === 'type') {
       result['type'] = `"${String(val)}"`
+      continue
+    }
+    if (tag === 'Input' && key === 'value') {
+      // If value is a state variable reference or expression, bind it
+      if (typeof val === 'string') {
+        let expr = val
+        // Remove {{ }} wrapper if present
+        if (expr.startsWith('{{') && expr.endsWith('}}')) {
+          expr = expr.slice(2, -2).trim()
+        }
+        // Convert FSP variable syntax to JSX
+        expr = expr
+          .replace(/\$state\.(\w+)/g, '$1')
+          .replace(/\$item\.(\w+)/g, 'item.$1')
+          .replace(/\$ds\.(\w+)\.data\b/g, '$1Data')
+          .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
+          .replace(/^\$/, '')
+        result['value'] = `{${expr}}`
+      }
       continue
     }
 
@@ -63,11 +93,41 @@ export function mapProps(
 
     // Textarea-specific mappings
     if (tag === 'Textarea' && key === 'placeholder') {
-      result['placeholder'] = `"${String(val)}"`
+      // Check if it's an expression
+      if (String(val).startsWith('{{') && String(val).endsWith('}}')) {
+        const expr = String(val).slice(2, -2).trim()
+          .replace(/\$state\.(\w+)/g, '$1')
+          .replace(/\$item\.(\w+)/g, 'item.$1')
+          .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+          .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
+          .replace(/^\$/, '')
+        result['placeholder'] = `{${expr}}`
+      } else {
+        result['placeholder'] = `"${String(val)}"`
+      }
       continue
     }
     if (tag === 'Textarea' && key === 'maxLength') {
       result['maxlength'] = `{${val}}`
+      continue
+    }
+    if (tag === 'Textarea' && key === 'value') {
+      // If value is a state variable reference or expression, bind it
+      if (typeof val === 'string') {
+        let expr = val
+        // Remove {{ }} wrapper if present
+        if (expr.startsWith('{{') && expr.endsWith('}}')) {
+          expr = expr.slice(2, -2).trim()
+        }
+        // Convert FSP variable syntax to JSX
+        expr = expr
+          .replace(/\$state\.(\w+)/g, '$1')
+          .replace(/\$item\.(\w+)/g, 'item.$1')
+          .replace(/\$ds\.(\w+)\.data\b/g, '$1Data')
+          .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
+          .replace(/^\$/, '')
+        result['value'] = `{${expr}}`
+      }
       continue
     }
 
@@ -116,7 +176,10 @@ export function mapProps(
         const expr = val.slice(2, -2).trim()
           .replace(/\$state\.(\w+)/g, '$1')
           .replace(/\$item\.(\w+)/g, 'item.$1')
-          .replace(/\$ds\.(\w+)\.data/g, '$1Data')
+          // Handle $ds.dataSourceId.data -> dataSourceIdData (must come before generic field access)
+          .replace(/\$ds\.(\w+)\.data\b/g, '$1Data')
+          // Handle $ds.dataSourceId.fieldName -> dataSourceIdData?.fieldName
+          .replace(/\$ds\.([^.]+)\.([^.\s}]+)/g, '$1Data?.$2')
           .replace(/^\$/, '')
         result[key] = `{${expr}}`
       } else {

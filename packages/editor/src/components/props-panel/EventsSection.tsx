@@ -170,6 +170,7 @@ export function EventsSection() {
                     setActionParams={setActionParams}
                     schema={schema}
                     pageFormStates={pageFormStates}
+                    allDataSources={allDataSources}
                     onSave={() => handleSaveAction(eventName, actions)}
                     onCancel={() => { setEditingEvent(null); setEditingActionIndex(null); setActionParams({}) }}
                   />
@@ -193,7 +194,7 @@ export function EventsSection() {
 
 function ActionEditor({
   actionType, actionParams, setActionType, setActionParams,
-  schema, pageFormStates, onSave, onCancel,
+  schema, pageFormStates, allDataSources, onSave, onCancel,
 }: {
   actionType: string
   actionParams: Record<string, any>
@@ -201,6 +202,7 @@ function ActionEditor({
   setActionParams: (p: Record<string, any>) => void
   schema: any
   pageFormStates: any[]
+  allDataSources: any[]
   onSave: () => void
   onCancel: () => void
 }) {

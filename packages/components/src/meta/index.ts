@@ -116,10 +116,12 @@ export const InputMeta: ComponentMeta = {
   icon: 'text-cursor',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', type: 'text' },
+  defaultProps: { placeholder: '请输入', type: 'text', value: '', name: '' },
   defaultStyles: {},
   supportedEvents: ['onChange'],
   propsSchema: [
+    { name: 'name', title: '字段名', type: 'string', default: '' },
+    { name: 'value', title: '绑定值', type: 'string', default: '' },
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     {
       name: 'type',
@@ -189,10 +191,11 @@ export const TextareaMeta: ComponentMeta = {
   icon: 'align-left',
   category: 'basic',
   allowChildren: false,
-  defaultProps: { placeholder: '请输入', maxLength: 200 },
+  defaultProps: { placeholder: '请输入', maxLength: 200, value: '' },
   defaultStyles: {},
   supportedEvents: ['onChange'],
   propsSchema: [
+    { name: 'value', title: '绑定值', type: 'string', default: '' },
     { name: 'placeholder', title: '占位文字', type: 'string', default: '请输入' },
     { name: 'maxLength', title: '最大长度', type: 'number', default: 200 },
   ],
@@ -219,10 +222,12 @@ export const FormMeta: ComponentMeta = {
   icon: 'file-text',
   category: 'data',
   allowChildren: true,
-  defaultProps: {},
+  defaultProps: { dataSourceId: '' },
   defaultStyles: { padding: 12 },
   supportedEvents: ['onSubmit'],
-  propsSchema: [],
+  propsSchema: [
+    { name: 'dataSourceId', title: '提交数据源', type: 'string', default: '' },
+  ],
 }
 
 export const SwiperMeta: ComponentMeta = {

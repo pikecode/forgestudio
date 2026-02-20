@@ -3,6 +3,7 @@ import type { Action } from '@forgestudio/protocol'
 import { findNodeById } from '@forgestudio/protocol'
 import { useEditorStore } from '../../store'
 import { StatePanel } from '../StatePanel'
+import { FormConfigSection } from './FormConfigSection'
 
 export function DataBindingSection() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
@@ -15,6 +16,7 @@ export function DataBindingSection() {
   const removeFormState = useEditorStore((s) => s.removeFormState)
 
   const [showStateManager, setShowStateManager] = useState(false)
+  const [inputValue, setInputValue] = useState('')
 
   const currentPage = getCurrentPage()
   const pageFormStates = currentPage?.formStates ?? []
@@ -22,10 +24,43 @@ export function DataBindingSection() {
   const node = selectedNodeId ? findNodeById(schema.componentTree, selectedNodeId) : null
   if (!node) return null
 
+  const isForm = node.component === 'Form'
   const isBindable = node.component === 'Input' || node.component === 'Textarea' || node.component === 'Switch'
+
+  // Sync local input with node's bound state variable
+  React.useEffect(() => {
+    const boundVar = node.events?.onChange?.[0]?.type === 'setState'
+      ? node.events.onChange[0].target
+      : ''
+    setInputValue(boundVar)
+  }, [node.events?.onChange])
+
+  const handleBindVariable = () => {
+    const varName = inputValue.trim()
+    if (varName) {
+      const action: Action = { type: 'setState', target: varName, value: 'e.detail.value' }
+      updateNodeEvents(node.id, 'onChange', [action])
+      const isSwitch = node.component === 'Switch'
+      const stateType = isSwitch ? 'boolean' : 'string'
+      const defaultValue = isSwitch ? false : ''
+      const bindProp = isSwitch ? 'checked' : 'value'
+      const existingState = pageFormStates.find(fs => fs.id === varName)
+      if (!existingState) {
+        addFormState(varName, { type: stateType, defaultValue })
+      }
+      updateNodeProps(node.id, { [bindProp]: `{{${varName}}}` })
+    } else {
+      updateNodeEvents(node.id, 'onChange', [])
+      const bindProp = node.component === 'Switch' ? 'checked' : 'value'
+      updateNodeProps(node.id, { [bindProp]: node.component === 'Switch' ? false : '' })
+    }
+  }
 
   return (
     <>
+      {/* Form Configuration */}
+      {isForm && <FormConfigSection formNode={node} />}
+
       {/* Data Binding for Input/Textarea/Switch */}
       {isBindable && (
         <>
@@ -37,34 +72,17 @@ export function DataBindingSection() {
             <input
               type="text"
               placeholder={node.component === 'Switch' ? '例如: isChecked' : '例如: inputValue'}
-              value={
-                node.events?.onChange?.[0]?.type === 'setState'
-                  ? node.events.onChange[0].target
-                  : ''
-              }
-              onChange={(e) => {
-                const varName = e.target.value.trim()
-                if (varName) {
-                  const action: Action = { type: 'setState', target: varName, value: 'e.detail.value' }
-                  updateNodeEvents(node.id, 'onChange', [action])
-                  const isSwitch = node.component === 'Switch'
-                  const stateType = isSwitch ? 'boolean' : 'string'
-                  const defaultValue = isSwitch ? false : ''
-                  const bindProp = isSwitch ? 'checked' : 'value'
-                  const existingState = pageFormStates.find(fs => fs.id === varName)
-                  if (!existingState) {
-                    addFormState(varName, { type: stateType, defaultValue })
-                  }
-                  updateNodeProps(node.id, { [bindProp]: `{{${varName}}}` })
-                } else {
-                  updateNodeEvents(node.id, 'onChange', [])
-                  const bindProp = node.component === 'Switch' ? 'checked' : 'value'
-                  updateNodeProps(node.id, { [bindProp]: node.component === 'Switch' ? false : '' })
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onBlur={handleBindVariable}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleBindVariable()
                 }
               }}
               style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d0d0d0', borderRadius: 4 }}
             />
-            <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>输入变量名后自动创建双向绑定</div>
+            <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>输入变量名后按回车或失焦自动创建双向绑定</div>
           </div>
         </>
       )}
