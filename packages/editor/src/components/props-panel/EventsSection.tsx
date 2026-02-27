@@ -360,7 +360,13 @@ function ActionEditor({
               readOnly
             />
             <button
-              onClick={() => openWorkflowEditor(actionParams.workflowId || `wf-${Date.now()}`)}
+              onClick={() => {
+                const wfId = actionParams.workflowId || `wf-${Date.now()}`
+                if (!actionParams.workflowId) {
+                  setActionParams({ ...actionParams, workflowId: wfId })
+                }
+                openWorkflowEditor(wfId)
+              }}
               style={{ padding: '4px 10px', fontSize: 12, color: '#fff', background: '#1890ff', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               编辑流程

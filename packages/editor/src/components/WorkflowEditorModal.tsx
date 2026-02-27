@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useEditorStore } from '../store'
 import type { WFPSchema } from '@forgestudio/workflow-protocol'
 import { createWorkflow } from '@forgestudio/workflow-protocol'
@@ -16,18 +16,19 @@ export function WorkflowEditorModal() {
 
   const [localWorkflow, setLocalWorkflow] = useState<WFPSchema | null>(null)
 
-  if (!activeWorkflowId) return null
+  // Initialize localWorkflow when the modal opens or activeWorkflowId changes
+  useEffect(() => {
+    if (!activeWorkflowId) {
+      setLocalWorkflow(null)
+      return
+    }
+    const existingRef = schema.workflows?.find(w => w.id === activeWorkflowId)
+    const initial = (existingRef?.inline as WFPSchema | undefined)
+      ?? { ...createWorkflow('新流程', 'interaction'), id: activeWorkflowId }
+    setLocalWorkflow(initial)
+  }, [activeWorkflowId]) // intentionally omitting schema to avoid re-init on every schema change
 
-  const existingRef = schema.workflows?.find(w => w.id === activeWorkflowId)
-  const initialWorkflow: WFPSchema = localWorkflow
-    ?? (existingRef?.inline as WFPSchema | undefined)
-    ?? createWorkflow('新流程', 'interaction')
-
-  // If localWorkflow is null, initialize it
-  if (localWorkflow === null) {
-    setLocalWorkflow(initialWorkflow)
-    return null
-  }
+  if (!activeWorkflowId || !localWorkflow) return null
 
   const handleSave = () => {
     saveWorkflow(localWorkflow)
