@@ -242,6 +242,9 @@ importers:
       '@forgestudio/codegen-taro':
         specifier: workspace:*
         version: link:../codegen-taro
+      '@forgestudio/codegen-workflow':
+        specifier: workspace:*
+        version: link:../codegen-workflow
       '@forgestudio/components':
         specifier: workspace:*
         version: link:../components

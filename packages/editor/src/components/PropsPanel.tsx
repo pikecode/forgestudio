@@ -643,7 +643,7 @@ export function PropsPanel() {
                       • {action.type === 'navigate' && `跳转: ${action.url}${action.params ? ` (参数: ${Object.keys(action.params).join(', ')})` : ''}`}
                       {action.type === 'showToast' && `提示: ${action.title}`}
                       {action.type === 'setState' && `设置状态: ${action.target} = ${action.value}`}
-                      {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields.length}个字段)`}
+                      {action.type === 'submitForm' && `提交表单: ${action.method} ${action.url} (${action.fields?.length ?? 0}个字段)`}
                     </span>
                     <button
                       onClick={() => {
