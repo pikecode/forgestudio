@@ -1,5 +1,5 @@
-import type { WFPSchema, WFPActionNode } from './types'
-import { createWorkflow, createNode, createEdge } from './utils'
+import type { WFPSchema, WFPActionNode, WFPActionType } from './types'
+import { createWorkflow, createEdge, genId } from './utils'
 
 /**
  * Migrate a linear Action[] array to a WFP workflow schema.
@@ -16,13 +16,14 @@ export function migrateActionsToWorkflow(
   let prevNodeId = startNode.id
 
   for (const action of actions) {
-    const actionType = mapActionType(action.type)
-    const actionNode = createNode('action', actionLabel(action.type), {
-      x: 200,
-      y: 200 + wf.nodes.length * 80,
-    }) as WFPActionNode
-    ;(actionNode as any).actionType = actionType
-    ;(actionNode as any).config = buildConfig(action)
+    const actionNode: WFPActionNode = {
+      id: genId('action'),
+      type: 'action',
+      label: actionLabel(action.type),
+      position: { x: 200, y: 200 + wf.nodes.length * 80 },
+      actionType: mapActionType(action.type) as WFPActionType,
+      config: buildConfig(action),
+    }
     wf.nodes.push(actionNode)
     wf.edges.push(createEdge(prevNodeId, actionNode.id))
     prevNodeId = actionNode.id
@@ -33,13 +34,14 @@ export function migrateActionsToWorkflow(
         type: string
         [key: string]: unknown
       }>) {
-        const successType = mapActionType(successAction.type)
-        const successNode = createNode('action', actionLabel(successAction.type), {
-          x: 200,
-          y: 200 + wf.nodes.length * 80,
-        }) as WFPActionNode
-        ;(successNode as any).actionType = successType
-        ;(successNode as any).config = buildConfig(successAction)
+        const successNode: WFPActionNode = {
+          id: genId('action'),
+          type: 'action',
+          label: actionLabel(successAction.type),
+          position: { x: 200, y: 200 + wf.nodes.length * 80 },
+          actionType: mapActionType(successAction.type) as WFPActionType,
+          config: buildConfig(successAction),
+        }
         wf.nodes.push(successNode)
         wf.edges.push(createEdge(prevNodeId, successNode.id))
         prevNodeId = successNode.id

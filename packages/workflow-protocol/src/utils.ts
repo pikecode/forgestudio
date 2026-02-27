@@ -1,7 +1,7 @@
 import type { WFPSchema, WFPNode, WFPEdge, WFPNodeType } from './types'
 
 let _counter = 0
-function genId(prefix: string): string {
+export function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${++_counter}`
 }
 

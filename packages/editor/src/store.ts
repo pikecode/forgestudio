@@ -732,6 +732,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         } else {
           state.schema.workflows.push(ref)
         }
+        pushHistory(state)
       })
     },
   }
