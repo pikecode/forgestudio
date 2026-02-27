@@ -15,6 +15,8 @@ export interface FSPSchema {
   pages?: PageDef[]
   /** Global data sources shared across all pages (Area 2) */
   globalDataSources?: DataSourceDef[]
+  /** 内联流程定义列表 (Phase 1 新增) */
+  workflows?: WorkflowRef[]
 }
 
 export interface FSPMeta {
@@ -146,6 +148,7 @@ export type Action =
   | ShowToastAction
   | SetStateAction
   | SubmitFormAction
+  | ExecuteWorkflowAction
 
 export interface NavigateAction {
   type: 'navigate'
@@ -181,6 +184,24 @@ export interface SubmitFormAction {
   errorMessage?: string
   /** Actions to execute on success */
   onSuccess?: Action[]
+}
+
+/** 触发流程执行 (Phase 1 新增) */
+export interface ExecuteWorkflowAction {
+  type: 'executeWorkflow'
+  /** 关联的流程 ID */
+  workflowId: string
+  /** 传入流程的初始变量映射：变量名 → 表达式 */
+  inputMapping?: Record<string, string>
+}
+
+/** 流程引用（内联嵌入 FSP Schema） */
+export interface WorkflowRef {
+  id: string
+  name: string
+  type: 'interaction' | 'data-orchestration' | 'approval'
+  /** 内联流程定义（使用 unknown 避免对 workflow-protocol 包的循环依赖） */
+  inline?: unknown
 }
 
 // ============================================================
