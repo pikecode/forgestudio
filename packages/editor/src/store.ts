@@ -105,6 +105,8 @@ export interface EditorState {
   updatePageMeta: (pageId: string, updates: Partial<Pick<PageDef, 'name' | 'title' | 'path'>>) => void
 
   // Workflow actions (Phase 1)
+  showWorkflowPanel: boolean
+  setShowWorkflowPanel: (show: boolean) => void
   openWorkflowEditor: (workflowId: string | null) => void
   saveWorkflow: (workflow: WFPSchema) => void
 }
@@ -197,6 +199,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
     historyIndex: 0,
     clipboard: null,
     activeWorkflowId: null,
+    showWorkflowPanel: false,
 
     selectNode: (id) => set({ selectedNodeId: id }),
 
@@ -711,6 +714,8 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
     },
 
     // Workflow actions (Phase 1)
+    setShowWorkflowPanel: (show) => set({ showWorkflowPanel: show }),
+
     openWorkflowEditor: (workflowId) => {
       set(state => {
         state.activeWorkflowId = workflowId

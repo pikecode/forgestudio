@@ -15,6 +15,7 @@ export function Toolbar() {
   const canPaste = useEditorStore((s) => s.clipboard !== null && s.selectedNodeId !== null)
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
   const schema = useEditorStore((s) => s.schema)
+  const setShowWorkflowPanel = useEditorStore((s) => s.setShowWorkflowPanel)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleExport = () => {
@@ -92,6 +93,14 @@ export function Toolbar() {
         </button>
         <button className="forge-editor-btn" onClick={handleExport}>
           导出
+        </button>
+        <div style={{ width: 1, height: 20, backgroundColor: '#ddd', margin: '0 8px' }} />
+        <button
+          className="forge-editor-btn"
+          onClick={() => setShowWorkflowPanel(true)}
+          title="管理工作流程"
+        >
+          ⬡ 流程
         </button>
         <button
           className="forge-editor-btn forge-editor-btn--primary"

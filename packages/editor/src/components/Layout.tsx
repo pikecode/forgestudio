@@ -11,6 +11,7 @@ import { Toolbar } from './Toolbar'
 import { TreePanel } from './TreePanel'
 import { PageManager } from './PageManager'
 import { WorkflowEditorModal } from './WorkflowEditorModal'
+import { WorkflowListPanel } from './WorkflowListPanel'
 
 function useRecoveryToast() {
   React.useEffect(() => {
@@ -134,6 +135,7 @@ export function EditorLayout() {
         ) : null}
       </DragOverlay>
       <WorkflowEditorModal />
+      <WorkflowListPanel />
     </DndContext>
   )
 }
