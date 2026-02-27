@@ -1,0 +1,46 @@
+.wf-editor {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.wf-editor__toolbar {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.wf-editor__workflow-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+}
+
+.wf-editor__btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #555;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.wf-editor__btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.wf-editor__canvas {
+  flex: 1;
+  overflow: hidden;
+}
