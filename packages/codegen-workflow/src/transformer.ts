@@ -18,8 +18,9 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
   const lines: string[] = []
   const visited = new Set<string>()
 
-  function visit(nodeId: string, indent: number): void {
+  function visit(nodeId: string, indent: number, stopAt?: string): void {
     if (visited.has(nodeId)) return
+    if (stopAt !== undefined && nodeId === stopAt) return
     visited.add(nodeId)
 
     const node = schema.nodes.find(n => n.id === nodeId)
@@ -28,33 +29,71 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
     const pad = '  '.repeat(indent)
 
     if (node.type === 'action') {
-      const actionLines = generateActionLines(node as WFPActionNode, pad)
-      lines.push(...actionLines)
-      const outEdges = getEdgesByNode(schema, nodeId, 'outgoing')
-      for (const edge of outEdges) {
-        visit(edge.target, indent)
+      lines.push(...generateActionLines(node as WFPActionNode, pad))
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        visit(edge.target, indent, stopAt)
       }
     } else if (node.type === 'condition') {
-      generateConditionBlock(node as WFPConditionNode, schema, indent, lines, visited)
+      const condNode = node as WFPConditionNode
+      const outEdges = getEdgesByNode(schema, nodeId, 'outgoing')
+      const trueEdge = outEdges.find(e => e.condition === 'true' || e.label === 'true')
+      const falseEdge = outEdges.find(e => e.condition === 'false' || e.label === 'false')
+
+      // Find where both branches converge so we can continue after the if/else
+      const convergence =
+        trueEdge && falseEdge
+          ? findConvergence(schema, trueEdge.target, falseEdge.target)
+          : undefined
+
+      lines.push(`${pad}if (${condNode.expression}) {`)
+      if (trueEdge) visit(trueEdge.target, indent + 1, convergence)
+      lines.push(`${pad}} else {`)
+      if (falseEdge) visit(falseEdge.target, indent + 1, convergence)
+      lines.push(`${pad}}`)
+
+      if (convergence) visit(convergence, indent, stopAt)
     }
   }
 
-  const startOutEdges = getEdgesByNode(schema, startNode.id, 'outgoing')
-  for (const edge of startOutEdges) {
+  for (const edge of getEdgesByNode(schema, startNode.id, 'outgoing')) {
     visit(edge.target, 0)
   }
 
-  const fnName = toCamelCase(schema.name)
   return {
-    name: fnName,
+    name: toCamelCase(schema.name),
     params: [],
     body: lines.join('\n'),
   }
 }
 
+/**
+ * BFS from both branch targets to find the first node reachable from both.
+ * This is the post-condition convergence point.
+ */
+function findConvergence(schema: WFPSchema, trueTarget: string, falseTarget: string): string | undefined {
+  const trueReachable = new Set<string>()
+  const queue = [trueTarget]
+  while (queue.length) {
+    const id = queue.shift()!
+    if (trueReachable.has(id)) continue
+    trueReachable.add(id)
+    for (const e of getEdgesByNode(schema, id, 'outgoing')) queue.push(e.target)
+  }
+
+  const falseQueue = [falseTarget]
+  const falseVisited = new Set<string>()
+  while (falseQueue.length) {
+    const id = falseQueue.shift()!
+    if (falseVisited.has(id)) continue
+    falseVisited.add(id)
+    if (trueReachable.has(id)) return id
+    for (const e of getEdgesByNode(schema, id, 'outgoing')) falseQueue.push(e.target)
+  }
+  return undefined
+}
+
 function generateActionLines(node: WFPActionNode, pad: string): string[] {
   const { actionType, config, outputVar } = node
-  const varDecl = outputVar ? `const ${outputVar} = ` : ''
 
   if (actionType === 'showToast') {
     const title = JSON.stringify(config.title ?? '')
@@ -70,15 +109,25 @@ function generateActionLines(node: WFPActionNode, pad: string): string[] {
   if (actionType === 'setState') {
     const target = String(config.target ?? '')
     const value = String(config.value ?? '')
-    const setter = `set${capitalize(target)}`
-    return [`${pad}${setter}(${value})`]
+    return [`${pad}set${capitalize(target)}(${value})`]
   }
 
   if (actionType === 'callApi') {
     const dsId = String(config.dataSourceId ?? 'api')
+    if (outputVar) {
+      // Declare outside try so the variable is accessible after the block
+      return [
+        `${pad}let ${outputVar}`,
+        `${pad}try {`,
+        `${pad}  ${outputVar} = await fetch_${dsId}()`,
+        `${pad}} catch (error) {`,
+        `${pad}  throw new Error('API 调用失败')`,
+        `${pad}}`,
+      ]
+    }
     return [
       `${pad}try {`,
-      `${pad}  ${varDecl}await fetch_${dsId}()`,
+      `${pad}  await fetch_${dsId}()`,
       `${pad}} catch (error) {`,
       `${pad}  throw new Error('API 调用失败')`,
       `${pad}}`,
@@ -93,38 +142,6 @@ function generateActionLines(node: WFPActionNode, pad: string): string[] {
   }
 
   return [`${pad}// TODO: unknown action type "${actionType}"`]
-}
-
-function generateConditionBlock(
-  node: WFPConditionNode,
-  schema: WFPSchema,
-  indent: number,
-  lines: string[],
-  visited: Set<string>
-): void {
-  const pad = '  '.repeat(indent)
-  visited.add(node.id)
-  const outEdges = getEdgesByNode(schema, node.id, 'outgoing')
-  const trueEdge = outEdges.find(e => e.condition === 'true' || e.label === 'true')
-  const falseEdge = outEdges.find(e => e.condition === 'false' || e.label === 'false')
-
-  lines.push(`${pad}if (${node.expression}) {`)
-  if (trueEdge) {
-    const trueNode = schema.nodes.find(n => n.id === trueEdge.target)
-    if (trueNode && trueNode.type === 'action') {
-      const actionLines = generateActionLines(trueNode as WFPActionNode, pad + '  ')
-      lines.push(...actionLines)
-    }
-  }
-  lines.push(`${pad}} else {`)
-  if (falseEdge) {
-    const falseNode = schema.nodes.find(n => n.id === falseEdge.target)
-    if (falseNode && falseNode.type === 'action') {
-      const actionLines = generateActionLines(falseNode as WFPActionNode, pad + '  ')
-      lines.push(...actionLines)
-    }
-  }
-  lines.push(`${pad}}`)
 }
 
 function toCamelCase(str: string): string {

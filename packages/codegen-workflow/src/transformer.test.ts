@@ -94,4 +94,118 @@ describe('transformWorkflowToHandler', () => {
     expect(result).toHaveProperty('params')
     expect(Array.isArray(result.params)).toBe(true)
   })
+
+  it('generates all actions in a sequential chain', () => {
+    const wf = createWorkflow('seqFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const node1 = createNode('action', '校验表单', { x: 200, y: 100 }) as WFPActionNode
+    ;(node1 as any).actionType = 'validateForm'
+    ;(node1 as any).config = {}
+
+    const node2 = createNode('action', '调接口', { x: 200, y: 200 }) as WFPActionNode
+    ;(node2 as any).actionType = 'callApi'
+    ;(node2 as any).config = { dataSourceId: 'submit' }
+    ;(node2 as any).outputVar = 'result'
+
+    const node3 = createNode('action', '跳转', { x: 200, y: 300 }) as WFPActionNode
+    ;(node3 as any).actionType = 'navigate'
+    ;(node3 as any).config = { url: '/pages/success/index' }
+
+    wf.nodes.push(node1, node2, node3)
+    wf.edges.push(
+      createEdge(startNode.id, node1.id),
+      createEdge(node1.id, node2.id),
+      createEdge(node2.id, node3.id),
+      createEdge(node3.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    const body = result.body
+
+    // All 3 actions must appear in order
+    expect(body).toContain('validateForm')
+    expect(body).toContain('fetch_submit')
+    expect(body).toContain('Taro.navigateTo')
+    expect(body.indexOf('validateForm')).toBeLessThan(body.indexOf('fetch_submit'))
+    expect(body.indexOf('fetch_submit')).toBeLessThan(body.indexOf('Taro.navigateTo'))
+  })
+
+  it('captures callApi response into outputVar accessible after try block', () => {
+    const wf = createWorkflow('apiFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const apiNode = createNode('action', '调接口', { x: 200, y: 200 }) as WFPActionNode
+    ;(apiNode as any).actionType = 'callApi'
+    ;(apiNode as any).config = { dataSourceId: 'userApi' }
+    ;(apiNode as any).outputVar = 'userData'
+
+    const toastNode = createNode('action', '提示', { x: 200, y: 300 }) as WFPActionNode
+    ;(toastNode as any).actionType = 'showToast'
+    ;(toastNode as any).config = { title: '加载完成' }
+
+    wf.nodes.push(apiNode, toastNode)
+    wf.edges.push(
+      createEdge(startNode.id, apiNode.id),
+      createEdge(apiNode.id, toastNode.id),
+      createEdge(toastNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    const body = result.body
+
+    // userData must be declared BEFORE the try block so it's accessible after
+    const letIndex = body.indexOf('let userData')
+    const tryIndex = body.indexOf('try {')
+    expect(letIndex).toBeGreaterThanOrEqual(0)
+    expect(letIndex).toBeLessThan(tryIndex)
+    // And the toast after the try block should still be generated
+    expect(body).toContain('Taro.showToast')
+    expect(body.indexOf('try {')).toBeLessThan(body.indexOf('Taro.showToast'))
+  })
+
+  it('continues executing nodes after condition branches converge', () => {
+    const wf = createWorkflow('condContinueFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const condNode = createNode('condition', '判断', { x: 200, y: 200 })
+    ;(condNode as any).expression = 'res.code === 0'
+
+    const successNode = createNode('action', '成功提示', { x: 100, y: 350 }) as WFPActionNode
+    ;(successNode as any).actionType = 'showToast'
+    ;(successNode as any).config = { title: '成功' }
+
+    const failNode = createNode('action', '失败提示', { x: 300, y: 350 }) as WFPActionNode
+    ;(failNode as any).actionType = 'showToast'
+    ;(failNode as any).config = { title: '失败' }
+
+    const finalNode = createNode('action', '最终跳转', { x: 200, y: 500 }) as WFPActionNode
+    ;(finalNode as any).actionType = 'navigate'
+    ;(finalNode as any).config = { url: '/pages/home/index' }
+
+    wf.nodes.push(condNode, successNode, failNode, finalNode)
+    wf.edges.push(
+      createEdge(startNode.id, condNode.id),
+      { ...createEdge(condNode.id, successNode.id), condition: 'true', label: 'true' },
+      { ...createEdge(condNode.id, failNode.id), condition: 'false', label: 'false' },
+      createEdge(successNode.id, finalNode.id),
+      createEdge(failNode.id, finalNode.id),
+      createEdge(finalNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    const body = result.body
+
+    expect(body).toContain('if (res.code === 0)')
+    expect(body).toContain('成功')
+    expect(body).toContain('失败')
+    // Final node must appear AFTER the if/else block
+    expect(body).toContain('Taro.navigateTo')
+    const ifIndex = body.indexOf('if (res.code === 0)')
+    const navIndex = body.indexOf('Taro.navigateTo')
+    expect(navIndex).toBeGreaterThan(ifIndex)
+  })
 })
