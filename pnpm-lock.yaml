@@ -193,6 +193,22 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  packages/codegen-workflow:
+    dependencies:
+      '@forgestudio/codegen-core':
+        specifier: workspace:*
+        version: link:../codegen-core
+      '@forgestudio/workflow-protocol':
+        specifier: workspace:*
+        version: link:../workflow-protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.4.5
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@25.3.0)(@vitest/ui@4.0.18)(jsdom@24.1.3)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)
+
   packages/components:
     dependencies:
       '@forgestudio/protocol':
