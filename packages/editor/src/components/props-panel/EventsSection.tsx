@@ -13,7 +13,7 @@ export function EventsSection() {
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
   const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
-  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm'>('showToast')
+  const [actionType, setActionType] = useState<'navigate' | 'showToast' | 'setState' | 'submitForm' | 'executeWorkflow'>('showToast')
   const [actionParams, setActionParams] = useState<Record<string, any>>({})
 
   const currentPage = getCurrentPage()
@@ -50,6 +50,8 @@ export function EventsSection() {
       ? { type: 'showToast', title: actionParams.title || '', icon: actionParams.icon as 'success' | 'error' | 'loading' | 'none' | undefined }
       : actionType === 'submitForm'
       ? { type: 'submitForm', dataSourceId: actionParams.dataSourceId || '', fieldMapping: actionParams.fieldMapping || {} }
+      : actionType === 'executeWorkflow'
+      ? { type: 'executeWorkflow' as const, workflowId: actionParams.workflowId || '' }
       : { type: 'setState', target: actionParams.target || '', value: actionParams.value || '' }
 
     // If editing, replace the action at the index; otherwise, append
@@ -88,6 +90,7 @@ export function EventsSection() {
                           ? `提交表单: 数据源 ${action.dataSourceId} (${Object.keys(action.fieldMapping || {}).length}个映射)`
                           : `提交表单: ${action.method} ${action.url} (${(action.fields || []).length}个字段)`
                       )}
+                      {action.type === 'executeWorkflow' && `执行工作流: ${action.workflowId || '(未设置)'}`}
                     </span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button
@@ -120,6 +123,10 @@ export function EventsSection() {
                             setActionParams({
                               dataSourceId: action.dataSourceId || '',
                               fieldMapping: action.fieldMapping || {},
+                            })
+                          } else if (action.type === 'executeWorkflow') {
+                            setActionParams({
+                              workflowId: action.workflowId || '',
                             })
                           }
                         }}
@@ -193,6 +200,7 @@ function ActionEditor({
 }) {
   const inputStyle = { width: '100%', padding: '4px 8px', fontSize: 12, border: '1px solid #d0d0d0', borderRadius: 4 }
   const labelStyle = { fontSize: 12, color: '#555', display: 'block' as const, marginBottom: 4 }
+  const openWorkflowEditor = useEditorStore(s => s.openWorkflowEditor)
 
   return (
     <div style={{ marginTop: 8, padding: 8, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
@@ -203,6 +211,7 @@ function ActionEditor({
           <option value="navigate">页面跳转</option>
           <option value="setState">设置状态</option>
           <option value="submitForm">提交数据源</option>
+          <option value="executeWorkflow">使用工作流</option>
         </select>
       </div>
 
@@ -336,6 +345,28 @@ function ActionEditor({
           allDataSources={allDataSources}
           componentTree={componentTree}
         />
+      )}
+
+      {actionType === 'executeWorkflow' && (
+        <div style={{ marginBottom: 6 }}>
+          <label style={labelStyle}>工作流</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="text"
+              value={actionParams.workflowId || ''}
+              onChange={(e) => setActionParams({ ...actionParams, workflowId: e.target.value })}
+              placeholder="流程ID（保存后自动填充）"
+              style={inputStyle}
+              readOnly
+            />
+            <button
+              onClick={() => openWorkflowEditor(actionParams.workflowId || `wf-${Date.now()}`)}
+              style={{ padding: '4px 10px', fontSize: 12, color: '#fff', background: '#1890ff', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              编辑流程
+            </button>
+          </div>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: 6 }}>

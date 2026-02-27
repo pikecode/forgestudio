@@ -10,6 +10,7 @@ import { DataSourcePanel } from './DataSourcePanel'
 import { Toolbar } from './Toolbar'
 import { TreePanel } from './TreePanel'
 import { PageManager } from './PageManager'
+import { WorkflowEditorModal } from './WorkflowEditorModal'
 
 function useRecoveryToast() {
   React.useEffect(() => {
@@ -132,6 +133,7 @@ export function EditorLayout() {
           <div className="forge-editor-drag-overlay">{draggingName}</div>
         ) : null}
       </DragOverlay>
+      <WorkflowEditorModal />
     </DndContext>
   )
 }

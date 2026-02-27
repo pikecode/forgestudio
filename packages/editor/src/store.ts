@@ -2,7 +2,8 @@ import { create, type StoreApi, type UseBoundStore, StateCreator } from 'zustand
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { current } from 'immer'
-import type { FSPSchema, ComponentNode, DataSourceDef, Action, FormStateDef, PageDef } from '@forgestudio/protocol'
+import type { FSPSchema, ComponentNode, DataSourceDef, Action, FormStateDef, PageDef, WorkflowRef } from '@forgestudio/protocol'
+import type { WFPSchema } from '@forgestudio/workflow-protocol'
 import type { GeneratedProject } from '@forgestudio/codegen-core'
 import {
   createEmptySchema,
@@ -54,6 +55,9 @@ export interface EditorState {
   // Clipboard (M3)
   clipboard: ComponentNode | null
 
+  // Workflow state (Phase 1)
+  activeWorkflowId: string | null
+
   // Actions
   selectNode: (id: string | null) => void
   addNode: (parentId: string, componentName: string, index?: number) => void
@@ -99,6 +103,10 @@ export interface EditorState {
   addPage: (name: string, title: string) => void
   removePage: (pageId: string) => void
   updatePageMeta: (pageId: string, updates: Partial<Pick<PageDef, 'name' | 'title' | 'path'>>) => void
+
+  // Workflow actions (Phase 1)
+  openWorkflowEditor: (workflowId: string | null) => void
+  saveWorkflow: (workflow: WFPSchema) => void
 }
 
 // History management constants
@@ -188,6 +196,7 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
     history: [{ schema: structuredClone(initialSchema), currentPageId: initialPageId }],
     historyIndex: 0,
     clipboard: null,
+    activeWorkflowId: null,
 
     selectNode: (id) => set({ selectedNodeId: id }),
 
@@ -698,6 +707,31 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         if (!updated) return
 
         pushHistory(state)
+      })
+    },
+
+    // Workflow actions (Phase 1)
+    openWorkflowEditor: (workflowId) => {
+      set(state => {
+        state.activeWorkflowId = workflowId
+      })
+    },
+
+    saveWorkflow: (workflow) => {
+      set(state => {
+        if (!state.schema.workflows) state.schema.workflows = []
+        const idx = state.schema.workflows.findIndex(w => w.id === workflow.id)
+        const ref: WorkflowRef = {
+          id: workflow.id,
+          name: workflow.name,
+          type: workflow.type,
+          inline: workflow,
+        }
+        if (idx >= 0) {
+          state.schema.workflows[idx] = ref
+        } else {
+          state.schema.workflows.push(ref)
+        }
       })
     },
   }

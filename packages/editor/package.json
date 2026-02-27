@@ -17,6 +17,8 @@
     "@forgestudio/components": "workspace:*",
     "@forgestudio/data-binding": "workspace:*",
     "@forgestudio/protocol": "workspace:*",
+    "@forgestudio/workflow-editor": "workspace:*",
+    "@forgestudio/workflow-protocol": "workspace:*",
     "highlight.js": "^11.10.0",
     "immer": "^11.1.4",
     "jszip": "^3.10.0",
