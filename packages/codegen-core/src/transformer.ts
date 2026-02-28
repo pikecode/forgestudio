@@ -1,4 +1,4 @@
-import type { ComponentNode, FSPSchema, Action, DataSourceDef, PageDef } from '@forgestudio/protocol'
+import type { ComponentNode, FSPSchema, Action, DataSourceDef, PageDef, WorkflowRef } from '@forgestudio/protocol'
 import { getEffectiveDataSources, findNodeById } from '@forgestudio/protocol'
 import type {
   IRProject,
@@ -747,6 +747,32 @@ ${dataObj}
 
   const renderTree = transformNode(pageDef.componentTree)!
 
+  // Handle onLoad workflow (Phase 1 Feature 2)
+  let onLoadWorkflow: IRPage['onLoadWorkflow'] = undefined
+  if (pageDef.onLoadWorkflow?.workflowId) {
+    const workflow = schema.workflows?.find(w => w.id === pageDef.onLoadWorkflow!.workflowId)
+    if (workflow) {
+      // Convert workflow name to camelCase handler name
+      const handlerName = toCamelCase(workflow.name)
+      // Extract output variables from workflow inline definition
+      const outputVars: string[] = []
+      if (workflow.inline && typeof workflow.inline === 'object') {
+        const wfSchema = workflow.inline as any
+        if (wfSchema.nodes) {
+          for (const node of wfSchema.nodes) {
+            if (node.outputVar) {
+              outputVars.push(node.outputVar)
+            }
+          }
+        }
+      }
+      onLoadWorkflow = {
+        workflowHandlerName: handlerName,
+        outputVars,
+      }
+    }
+  }
+
   return {
     id: pageDef.id,
     name: pageDef.name,
@@ -758,5 +784,22 @@ ${dataObj}
     handlers,
     renderTree,
     styles: { rules: styleRules },
+    onLoadWorkflow,
   }
+}
+
+function toCamelCase(str: string): string {
+  const sanitized = str.replace(/[^a-zA-Z0-9\u4e00-\u9fa5\s_-]/g, '')
+  const words = sanitized.split(/[\s_-]+/)
+  if (words.length === 0) return 'workflow'
+  return (
+    words
+      .map((word, i) => {
+        if (!word) return ''
+        return i === 0
+          ? word.charAt(0).toLowerCase() + word.slice(1)
+          : word.charAt(0).toUpperCase() + word.slice(1)
+      })
+      .join('') || 'workflow'
+  )
 }

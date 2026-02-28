@@ -16,6 +16,11 @@ export interface IRPage {
   handlers: IRHandler[]      // empty in M1.2, for M1.3+
   renderTree: IRRenderNode
   styles: IRStyleSheet
+  /** Page load workflow (Phase 1 Feature 2) */
+  onLoadWorkflow?: {
+    workflowHandlerName: string  // e.g., 'handleUserDataFlow'
+    outputVars: string[]         // e.g., ['userData', 'products']
+  }
 }
 
 export interface IRImport {

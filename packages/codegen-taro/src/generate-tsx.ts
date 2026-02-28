@@ -35,15 +35,18 @@ export function generateTSX(ir: IRPage): string {
   const hasEffects = ir.effects.length > 0
   const hasHandlers = ir.handlers.length > 0
   const needsReactHooks = hasState || hasEffects
-  const needsTaro = hasEffects || hasHandlers
+  const needsTaro = hasEffects || hasHandlers || ir.onLoadWorkflow
+  const needsUseLoad = ir.onLoadWorkflow !== undefined
 
   let stateImport = ''
   if (needsReactHooks && needsTaro) {
-    stateImport = `import { useState, useEffect } from 'react'\nimport Taro from '@tarojs/taro'\n`
+    const hooks = needsUseLoad ? 'useState, useEffect, useLoad' : 'useState, useEffect'
+    stateImport = `import { ${hooks} } from 'react'\nimport Taro from '@tarojs/taro'\n`
   } else if (needsReactHooks) {
     stateImport = `import { useState, useEffect } from 'react'\n`
   } else if (needsTaro) {
-    stateImport = `import Taro from '@tarojs/taro'\n`
+    const hooks = needsUseLoad ? 'useLoad' : ''
+    stateImport = hooks ? `import { ${hooks} } from 'react'\nimport Taro from '@tarojs/taro'\n` : `import Taro from '@tarojs/taro'\n`
   }
 
   const stateDecls = ir.stateVars.map(v => {
@@ -84,10 +87,16 @@ export function generateTSX(ir: IRPage): string {
 
   const jsx = renderNode(ir.renderTree, 2, ir.handlers, false, 'item')
 
+  // Generate useLoad hook for page-level workflow
+  const useLoadCode = ir.onLoadWorkflow
+    ? `  useLoad(async () => {\n    await ${ir.onLoadWorkflow.workflowHandlerName}()\n  })`
+    : ''
+
   const bodyParts: string[] = []
   if (stateDecls) bodyParts.push(stateDecls)
   if (handlersCode) bodyParts.push(handlersCode)
   if (effectsCode) bodyParts.push(effectsCode)
+  if (useLoadCode) bodyParts.push(useLoadCode)
   const bodyStr = bodyParts.length > 0 ? bodyParts.join('\n\n') + '\n\n' : ''
 
   // Generate extractList helper if there are data sources with autoFetch
@@ -122,8 +131,13 @@ function extractList(data: any): any[] {
     .replace(/[-_](.)/g, (_, c) => c.toUpperCase())
     .replace(/^(.)/, (_, c) => c.toUpperCase()) || 'Index'
 
+  // Generate workflow handler import if needed
+  const workflowImport = ir.onLoadWorkflow
+    ? `import { ${ir.onLoadWorkflow.workflowHandlerName} } from '../workflow-handlers'\n`
+    : ''
+
   return `${stateImport}${importLine}
-import './${scssFileName}.scss'
+${workflowImport}import './${scssFileName}.scss'
 ${extractListFn}
 export default function ${componentName}() {
 ${bodyStr}  return (
