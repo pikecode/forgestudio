@@ -88,9 +88,14 @@ export function generateTSX(ir: IRPage): string {
   const jsx = renderNode(ir.renderTree, 2, ir.handlers, false, 'item')
 
   // Generate useLoad hook for page-level workflow
-  const useLoadCode = ir.onLoadWorkflow
-    ? `  useLoad(async () => {\n    await ${ir.onLoadWorkflow.workflowHandlerName}()\n  })`
-    : ''
+  let useLoadCode = ''
+  if (ir.onLoadWorkflow) {
+    const setters = ir.onLoadWorkflow.stateSetters
+    const argsStr = setters && setters.length > 0
+      ? `{ ${setters.join(', ')} }`
+      : ''
+    useLoadCode = `  useLoad(async () => {\n    await ${ir.onLoadWorkflow.workflowHandlerName}(${argsStr})\n  })`
+  }
 
   const bodyParts: string[] = []
   if (stateDecls) bodyParts.push(stateDecls)
