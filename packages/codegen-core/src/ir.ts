@@ -20,6 +20,7 @@ export interface IRPage {
   onLoadWorkflow?: {
     workflowHandlerName: string  // e.g., 'handleUserDataFlow'
     outputVars: string[]         // e.g., ['userData', 'products']
+    stateSetters?: string[]      // e.g., ['setProducts', 'setTotal'] from callApi stateMapping
   }
 }
 

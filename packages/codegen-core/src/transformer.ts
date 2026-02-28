@@ -758,8 +758,9 @@ ${dataObj}
     if (workflow) {
       // Convert workflow name to camelCase handler name
       const handlerName = toCamelCase(workflow.name)
-      // Extract output variables from workflow inline definition
+      // Extract output variables and stateSetters from workflow inline definition
       const outputVars: string[] = []
+      const stateSetters: string[] = []
       if (workflow.inline && typeof workflow.inline === 'object') {
         const wfSchema = workflow.inline as any
         if (wfSchema.nodes) {
@@ -767,12 +768,21 @@ ${dataObj}
             if (node.outputVar) {
               outputVars.push(node.outputVar)
             }
+            if (node.type === 'action' && node.actionType === 'callApi' && node.config?.stateMapping) {
+              const mapping = node.config.stateMapping as Record<string, string>
+              for (const setterName of Object.keys(mapping)) {
+                if (!stateSetters.includes(setterName)) {
+                  stateSetters.push(setterName)
+                }
+              }
+            }
           }
         }
       }
       onLoadWorkflow = {
         workflowHandlerName: handlerName,
         outputVars,
+        stateSetters: stateSetters.length > 0 ? stateSetters : undefined,
       }
     }
   }
