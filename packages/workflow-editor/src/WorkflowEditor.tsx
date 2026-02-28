@@ -326,6 +326,67 @@ export function WorkflowEditor({
                           onChange={(e) => handleUpdateNode(selectedNode.id, { outputVar: e.target.value })}
                         />
                       </div>
+                      <div className="wf-editor__prop-group">
+                        <label>状态映射</label>
+                        <div className="wf-editor__state-mapping">
+                          {Object.entries(selectedNode.properties?.config?.stateMapping || {}).map(([setter, path], idx) => (
+                            <div key={idx} className="wf-editor__mapping-row">
+                              <input
+                                type="text"
+                                className="wf-editor__mapping-input"
+                                placeholder="setProducts"
+                                value={setter}
+                                onChange={(e) => {
+                                  const entries = Object.entries(selectedNode.properties?.config?.stateMapping || {})
+                                  entries[idx] = [e.target.value, path as string]
+                                  const newMapping = Object.fromEntries(entries)
+                                  const newConfig = { ...selectedNode.properties?.config, stateMapping: newMapping }
+                                  handleUpdateNode(selectedNode.id, { config: newConfig })
+                                  setSelectedNode({ ...selectedNode, properties: { ...selectedNode.properties, config: newConfig } })
+                                }}
+                              />
+                              <span className="wf-editor__mapping-arrow">→</span>
+                              <input
+                                type="text"
+                                className="wf-editor__mapping-input"
+                                placeholder="data.list"
+                                value={path as string}
+                                onChange={(e) => {
+                                  const entries = Object.entries(selectedNode.properties?.config?.stateMapping || {})
+                                  entries[idx] = [setter, e.target.value]
+                                  const newMapping = Object.fromEntries(entries)
+                                  const newConfig = { ...selectedNode.properties?.config, stateMapping: newMapping }
+                                  handleUpdateNode(selectedNode.id, { config: newConfig })
+                                  setSelectedNode({ ...selectedNode, properties: { ...selectedNode.properties, config: newConfig } })
+                                }}
+                              />
+                              <button
+                                className="wf-editor__mapping-del"
+                                onClick={() => {
+                                  const newMapping = { ...(selectedNode.properties?.config?.stateMapping || {}) }
+                                  delete newMapping[setter]
+                                  const newConfig = { ...selectedNode.properties?.config, stateMapping: newMapping }
+                                  handleUpdateNode(selectedNode.id, { config: newConfig })
+                                  setSelectedNode({ ...selectedNode, properties: { ...selectedNode.properties, config: newConfig } })
+                                }}
+                              >×</button>
+                            </div>
+                          ))}
+                          <button
+                            className="wf-editor__mapping-add"
+                            onClick={() => {
+                              const existing = selectedNode.properties?.config?.stateMapping || {}
+                              let key = 'setter'
+                              let i = 1
+                              while (key in existing) key = `setter${i++}`
+                              const newMapping = { ...existing, [key]: '' }
+                              const newConfig = { ...selectedNode.properties?.config, stateMapping: newMapping }
+                              handleUpdateNode(selectedNode.id, { config: newConfig })
+                              setSelectedNode({ ...selectedNode, properties: { ...selectedNode.properties, config: newConfig } })
+                            }}
+                          >＋ 添加映射</button>
+                        </div>
+                      </div>
                     </>
                   )}
                 </>

@@ -151,3 +151,75 @@
   outline: none;
   border-color: #1890ff;
 }
+
+/* State mapping rows */
+.wf-editor__state-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wf-editor__mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wf-editor__mapping-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  font-size: 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #fff;
+  color: #333;
+}
+
+.wf-editor__mapping-input:focus {
+  outline: none;
+  border-color: #1890ff;
+}
+
+.wf-editor__mapping-arrow {
+  font-size: 12px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.wf-editor__mapping-del {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #999;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.wf-editor__mapping-del:hover {
+  color: #ff4d4f;
+}
+
+.wf-editor__mapping-add {
+  width: 100%;
+  padding: 5px;
+  font-size: 12px;
+  color: #1890ff;
+  background: none;
+  border: 1px dashed #91d5ff;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 2px;
+}
+
+.wf-editor__mapping-add:hover {
+  background: #e6f7ff;
+}
