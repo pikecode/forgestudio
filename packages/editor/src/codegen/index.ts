@@ -24,7 +24,13 @@ export function generateWorkflowHandlers(schema: FSPSchema): string {
     try {
       const handler = transformWorkflowToHandler(ref.inline as WFPSchema)
       lines.push(`// 流程: ${ref.name}`)
-      lines.push(`export async function ${handler.name}(${handler.params.join(', ')}) {`)
+      let paramsStr = handler.params.join(', ')
+      if (handler.stateSetterNames && handler.stateSetterNames.length > 0) {
+        const typeEntries = handler.stateSetterNames.map(n => `${n}: (v: any) => void`).join('; ')
+        const setterParam = `stateSetters: { ${typeEntries} }`
+        paramsStr = paramsStr ? `${setterParam}, ${paramsStr}` : setterParam
+      }
+      lines.push(`export async function ${handler.name}(${paramsStr}) {`)
       if (handler.body) {
         handler.body.split('\n').forEach(line => lines.push('  ' + line))
       }
