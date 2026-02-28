@@ -208,4 +208,57 @@ describe('transformWorkflowToHandler', () => {
     const navIndex = body.indexOf('Taro.navigateTo')
     expect(navIndex).toBeGreaterThan(ifIndex)
   })
+
+  it('generates Promise.all for parallel node with multiple branches', () => {
+    const wf = createWorkflow('parallelFlow', 'data-orchestration')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const parallelNode = createNode('parallel', '并行拉取', { x: 200, y: 200 })
+    ;(parallelNode as any).outputVar = 'results'
+
+    const api1 = createNode('action', '拉取用户', { x: 100, y: 350 }) as WFPActionNode
+    ;(api1 as any).actionType = 'callApi'
+    ;(api1 as any).config = { dataSourceId: 'userApi' }
+
+    const api2 = createNode('action', '拉取产品', { x: 200, y: 350 }) as WFPActionNode
+    ;(api2 as any).actionType = 'callApi'
+    ;(api2 as any).config = { dataSourceId: 'productApi' }
+
+    const api3 = createNode('action', '拉取购物车', { x: 300, y: 350 }) as WFPActionNode
+    ;(api3 as any).actionType = 'callApi'
+    ;(api3 as any).config = { dataSourceId: 'cartApi' }
+
+    const toastNode = createNode('action', '完成提示', { x: 200, y: 500 }) as WFPActionNode
+    ;(toastNode as any).actionType = 'showToast'
+    ;(toastNode as any).config = { title: '加载完成' }
+
+    wf.nodes.push(parallelNode, api1, api2, api3, toastNode)
+    wf.edges.push(
+      createEdge(startNode.id, parallelNode.id),
+      createEdge(parallelNode.id, api1.id),
+      createEdge(parallelNode.id, api2.id),
+      createEdge(parallelNode.id, api3.id),
+      createEdge(api1.id, toastNode.id),
+      createEdge(api2.id, toastNode.id),
+      createEdge(api3.id, toastNode.id),
+      createEdge(toastNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    const body = result.body
+
+    // Must generate Promise.all
+    expect(body).toContain('Promise.all')
+    // Must declare results variable
+    expect(body).toContain('const results =')
+    // All 3 API calls must be inside Promise.all
+    expect(body).toContain('fetch_userApi')
+    expect(body).toContain('fetch_productApi')
+    expect(body).toContain('fetch_cartApi')
+    // Toast must appear after Promise.all
+    const promiseIndex = body.indexOf('Promise.all')
+    const toastIndex = body.indexOf('Taro.showToast')
+    expect(toastIndex).toBeGreaterThan(promiseIndex)
+  })
 })

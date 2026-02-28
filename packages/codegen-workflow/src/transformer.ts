@@ -1,4 +1,4 @@
-import type { WFPSchema, WFPActionNode, WFPConditionNode } from '@forgestudio/workflow-protocol'
+import type { WFPSchema, WFPActionNode, WFPConditionNode, WFPParallelNode } from '@forgestudio/workflow-protocol'
 import { getEdgesByNode } from '@forgestudio/workflow-protocol'
 
 export interface WorkflowHandler {
@@ -52,7 +52,69 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
       lines.push(`${pad}}`)
 
       if (convergence) visit(convergence, indent, stopAt)
+    } else if (node.type === 'parallel') {
+      const parallelNode = node as WFPParallelNode
+      const outEdges = getEdgesByNode(schema, nodeId, 'outgoing')
+
+      // Find convergence point (where all branches meet)
+      const branchTargets = outEdges.map(e => e.target)
+      const convergence = branchTargets.length > 1
+        ? findMultiBranchConvergence(schema, branchTargets)
+        : undefined
+
+      // Collect code for each branch
+      const branches: string[] = []
+      for (const edge of outEdges) {
+        const branchLines: string[] = []
+        const branchVisited = new Set<string>()
+        collectBranchCode(edge.target, indent + 1, convergence, branchLines, branchVisited)
+        branches.push(branchLines.join('\\n'))
+      }
+
+      // Generate Promise.all
+      if (parallelNode.outputVar) {
+        lines.push(`${pad}const ${parallelNode.outputVar} = await Promise.all([`)
+      } else {
+        lines.push(`${pad}await Promise.all([`)
+      }
+
+      branches.forEach((branchCode, i) => {
+        lines.push(`${pad}  (async () => {`)
+        lines.push(branchCode)
+        lines.push(`${pad}  })()${i < branches.length - 1 ? ',' : ''}`)
+      })
+
+      lines.push(`${pad}])`)
+
+      // Continue after convergence
+      if (convergence) visit(convergence, indent, stopAt)
     }
+  }
+
+  // Helper: collect code for a single branch
+  function collectBranchCode(
+    nodeId: string,
+    indent: number,
+    stopAt: string | undefined,
+    branchLines: string[],
+    branchVisited: Set<string>
+  ): void {
+    if (branchVisited.has(nodeId)) return
+    if (stopAt && nodeId === stopAt) return
+    branchVisited.add(nodeId)
+
+    const node = schema.nodes.find(n => n.id === nodeId)
+    if (!node || node.type === 'end') return
+
+    const pad = '  '.repeat(indent)
+
+    if (node.type === 'action') {
+      branchLines.push(...generateActionLines(node as WFPActionNode, pad))
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        collectBranchCode(edge.target, indent, stopAt, branchLines, branchVisited)
+      }
+    }
+    // Note: nested condition/parallel in branches not supported in Phase 1
   }
 
   for (const edge of getEdgesByNode(schema, startNode.id, 'outgoing')) {
@@ -89,6 +151,47 @@ function findConvergence(schema: WFPSchema, trueTarget: string, falseTarget: str
     if (trueReachable.has(id)) return id
     for (const e of getEdgesByNode(schema, id, 'outgoing')) falseQueue.push(e.target)
   }
+  return undefined
+}
+
+/**
+ * Find convergence point for multiple branches (parallel node).
+ * Returns the first node reachable from ALL branch targets.
+ */
+function findMultiBranchConvergence(schema: WFPSchema, branchTargets: string[]): string | undefined {
+  if (branchTargets.length === 0) return undefined
+  if (branchTargets.length === 1) return branchTargets[0]
+
+  // Build reachability sets for each branch
+  const reachabilitySets = branchTargets.map(target => {
+    const reachable = new Set<string>()
+    const queue = [target]
+    while (queue.length) {
+      const id = queue.shift()!
+      if (reachable.has(id)) continue
+      reachable.add(id)
+      for (const e of getEdgesByNode(schema, id, 'outgoing')) queue.push(e.target)
+    }
+    return reachable
+  })
+
+  // Find first node in ALL reachability sets
+  // Use BFS from first branch to maintain order
+  const queue = [branchTargets[0]]
+  const visited = new Set<string>()
+  while (queue.length) {
+    const id = queue.shift()!
+    if (visited.has(id)) continue
+    visited.add(id)
+
+    // Check if this node is reachable from all branches
+    if (reachabilitySets.every(set => set.has(id))) {
+      return id
+    }
+
+    for (const e of getEdgesByNode(schema, id, 'outgoing')) queue.push(e.target)
+  }
+
   return undefined
 }
 

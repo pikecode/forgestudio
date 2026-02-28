@@ -76,6 +76,8 @@ export interface WFPConditionNode extends WFPNodeBase {
 export interface WFPParallelNode extends WFPNodeBase {
   type: 'parallel'
   mode: 'fork' | 'join'
+  /** Output variable to store Promise.all results (fork mode only) */
+  outputVar?: string
 }
 
 export interface WFPWaitNode extends WFPNodeBase {

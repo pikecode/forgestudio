@@ -86,6 +86,27 @@ export function WorkflowEditor({
         lf.on('blank:click', () => {
           setSelectedNode(null)
         })
+
+        // Auto-label condition node edges as true/false
+        lf.on('edge:add', ({ data }: any) => {
+          const sourceNode = lf.getNodeModelById(data.sourceNodeId)
+          if (sourceNode?.type === 'condition') {
+            const outEdges = lf.getNodeOutgoingEdge(data.sourceNodeId)
+            if (outEdges.length === 1) {
+              // First edge: true branch
+              lf.getEdgeModelById(data.id)?.setText('true')
+              lf.getEdgeModelById(data.id)?.setProperties({ condition: 'true', label: 'true' })
+            } else if (outEdges.length === 2) {
+              // Second edge: false branch
+              lf.getEdgeModelById(data.id)?.setText('false')
+              lf.getEdgeModelById(data.id)?.setProperties({ condition: 'false', label: 'false' })
+            } else if (outEdges.length > 2) {
+              // Limit to 2 branches
+              lf.deleteEdge(data.id)
+              alert('条件节点最多只能有两个分支（true/false）')
+            }
+          }
+        })
       }
     }
 
