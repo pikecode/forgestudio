@@ -8,6 +8,8 @@ export interface WorkflowHandler {
   body: string
   /** Parameter list */
   params: string[]
+  /** Names of state setters collected from callApi stateMapping */
+  stateSetterNames?: string[]
 }
 
 /** Convert WFP Schema to a Taro async handler function */
@@ -210,10 +212,13 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
     visit(edge.target, 0)
   }
 
+  const stateSetterNames = collectSetterNames(schema)
+
   return {
     name: toCamelCase(schema.name),
     params: [],
     body: lines.join('\n'),
+    stateSetterNames: stateSetterNames.length > 0 ? stateSetterNames : undefined,
   }
 }
 
@@ -305,6 +310,22 @@ function findLoopExit(
   return undefined
 }
 
+function collectSetterNames(schema: WFPSchema): string[] {
+  const setters = new Set<string>()
+  for (const node of schema.nodes) {
+    if (node.type === 'action') {
+      const actionNode = node as WFPActionNode
+      if (actionNode.actionType === 'callApi' && actionNode.config.stateMapping) {
+        const mapping = actionNode.config.stateMapping as Record<string, string>
+        for (const setterName of Object.keys(mapping)) {
+          setters.add(setterName)
+        }
+      }
+    }
+  }
+  return Array.from(setters)
+}
+
 function generateActionLines(node: WFPActionNode, pad: string): string[] {
   const { actionType, config, outputVar } = node
 
@@ -327,24 +348,40 @@ function generateActionLines(node: WFPActionNode, pad: string): string[] {
 
   if (actionType === 'callApi') {
     const dsId = String(config.dataSourceId ?? 'api')
+    const stateMapping = config.stateMapping as Record<string, string> | undefined
+    const resultVar = outputVar || '_result'
+    const resultLines: string[] = []
+
     if (outputVar) {
-      // Declare outside try so the variable is accessible after the block
-      return [
-        `${pad}let ${outputVar}`,
-        `${pad}try {`,
-        `${pad}  ${outputVar} = await fetch_${dsId}()`,
-        `${pad}} catch (error) {`,
-        `${pad}  throw new Error('API 调用失败')`,
-        `${pad}}`,
-      ]
+      resultLines.push(`${pad}let ${outputVar}`)
+      resultLines.push(`${pad}try {`)
+      resultLines.push(`${pad}  ${outputVar} = await fetch_${dsId}()`)
+      resultLines.push(`${pad}} catch (error) {`)
+      resultLines.push(`${pad}  throw new Error('API 调用失败')`)
+      resultLines.push(`${pad}}`)
+    } else if (stateMapping && Object.keys(stateMapping).length > 0) {
+      resultLines.push(`${pad}let ${resultVar}`)
+      resultLines.push(`${pad}try {`)
+      resultLines.push(`${pad}  ${resultVar} = await fetch_${dsId}()`)
+      resultLines.push(`${pad}} catch (error) {`)
+      resultLines.push(`${pad}  throw new Error('API 调用失败')`)
+      resultLines.push(`${pad}}`)
+    } else {
+      resultLines.push(`${pad}try {`)
+      resultLines.push(`${pad}  await fetch_${dsId}()`)
+      resultLines.push(`${pad}} catch (error) {`)
+      resultLines.push(`${pad}  throw new Error('API 调用失败')`)
+      resultLines.push(`${pad}}`)
     }
-    return [
-      `${pad}try {`,
-      `${pad}  await fetch_${dsId}()`,
-      `${pad}} catch (error) {`,
-      `${pad}  throw new Error('API 调用失败')`,
-      `${pad}}`,
-    ]
+
+    if (stateMapping && Object.keys(stateMapping).length > 0) {
+      for (const [setter, path] of Object.entries(stateMapping)) {
+        const accessPath = path.split('.').join('?.')
+        resultLines.push(`${pad}stateSetters.${setter}(${resultVar}?.${accessPath})`)
+      }
+    }
+
+    return resultLines
   }
 
   if (actionType === 'validateForm') {

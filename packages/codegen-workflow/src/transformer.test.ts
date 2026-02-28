@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { transformWorkflowToHandler } from './transformer'
 import { createWorkflow, createNode, createEdge } from '@forgestudio/workflow-protocol'
-import type { WFPActionNode, WFPWaitNode } from '@forgestudio/workflow-protocol'
+import type { WFPActionNode, WFPWaitNode, WFPSchema } from '@forgestudio/workflow-protocol'
 
 describe('transformWorkflowToHandler', () => {
   it('generates async function body for showToast action', () => {
@@ -368,6 +368,56 @@ describe('transformWorkflowToHandler', () => {
 
     const result = transformWorkflowToHandler(wf)
     expect(result.body).toContain('await handleSendNotification()')
+  })
+
+  it('generates stateSetters calls for callApi with stateMapping', () => {
+    const schema: WFPSchema = {
+      id: 'wf1', name: 'loadPage', type: 'data-orchestration', version: '1',
+      variables: [], edges: [
+        { id: 'e1', source: 'start', target: 'n1' },
+        { id: 'e2', source: 'n1', target: 'end' },
+      ],
+      nodes: [
+        { id: 'start', type: 'start', label: 'Start', position: { x: 0, y: 0 } },
+        {
+          id: 'n1', type: 'action', label: 'Load Products',
+          position: { x: 0, y: 100 },
+          actionType: 'callApi',
+          outputVar: 'result',
+          config: {
+            dataSourceId: 'products',
+            stateMapping: { setProducts: 'data.list', setTotal: 'data.total' },
+          },
+        },
+        { id: 'end', type: 'end', label: 'End', position: { x: 0, y: 200 } },
+      ],
+    }
+    const handler = transformWorkflowToHandler(schema)
+    expect(handler.stateSetterNames).toEqual(expect.arrayContaining(['setProducts', 'setTotal']))
+    expect(handler.body).toContain('stateSetters.setProducts(result?.data?.list)')
+    expect(handler.body).toContain('stateSetters.setTotal(result?.data?.total)')
+  })
+
+  it('stateSetterNames is undefined when no stateMapping used', () => {
+    const schema: WFPSchema = {
+      id: 'wf2', name: 'simpleFlow', type: 'data-orchestration', version: '1',
+      variables: [], edges: [
+        { id: 'e1', source: 'start', target: 'n1' },
+        { id: 'e2', source: 'n1', target: 'end' },
+      ],
+      nodes: [
+        { id: 'start', type: 'start', label: 'Start', position: { x: 0, y: 0 } },
+        {
+          id: 'n1', type: 'action', label: 'Toast',
+          position: { x: 0, y: 100 },
+          actionType: 'showToast',
+          config: { title: 'Hello' },
+        },
+        { id: 'end', type: 'end', label: 'End', position: { x: 0, y: 200 } },
+      ],
+    }
+    const handler = transformWorkflowToHandler(schema)
+    expect(handler.stateSetterNames).toBeUndefined()
   })
 
   it('generates warning comment for unknown node type', () => {
