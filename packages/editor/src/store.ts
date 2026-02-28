@@ -103,6 +103,7 @@ export interface EditorState {
   addPage: (name: string, title: string) => void
   removePage: (pageId: string) => void
   updatePageMeta: (pageId: string, updates: Partial<Pick<PageDef, 'name' | 'title' | 'path'>>) => void
+  updatePageOnLoadWorkflow: (pageId: string, workflowId?: string) => void
 
   // Workflow actions (Phase 1)
   showWorkflowPanel: boolean
@@ -709,6 +710,19 @@ const storeCreator: StateCreator<EditorState, [['zustand/immer', never]], []> = 
         const updated = updatePageInSchema(state.schema, pageId, updates)
         if (!updated) return
 
+        pushHistory(state)
+      })
+    },
+
+    updatePageOnLoadWorkflow: (pageId, workflowId) => {
+      set((state) => {
+        const page = findPageById(state.schema, pageId)
+        if (!page) return
+        if (workflowId) {
+          page.onLoadWorkflow = { workflowId }
+        } else {
+          delete page.onLoadWorkflow
+        }
         pushHistory(state)
       })
     },

@@ -39,6 +39,12 @@ export interface PageDef {
   params?: PageParamDef[]
   /** References to global data sources (Area 2) */
   globalDataSourceRefs?: string[]
+  /** Page load workflow (Phase 1 Feature 2) */
+  onLoadWorkflow?: {
+    workflowId: string
+    /** Map workflow output variables to virtual data source IDs */
+    outputMapping?: Record<string, string>
+  }
 }
 
 /** Page parameter definition (M4) */

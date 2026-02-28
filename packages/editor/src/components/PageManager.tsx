@@ -3,12 +3,14 @@ import { useEditorStore } from '../store'
 
 export function PageManager() {
   const { schema, currentPageId, setCurrentPage, addPage, removePage, updatePageMeta } = useEditorStore()
+  const updatePageOnLoadWorkflow = useEditorStore(s => s.updatePageOnLoadWorkflow)
   const [isAddingPage, setIsAddingPage] = useState(false)
   const [newPageName, setNewPageName] = useState('')
   const [newPageTitle, setNewPageTitle] = useState('')
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editTitle, setEditTitle] = useState('')
+  const [editWorkflowId, setEditWorkflowId] = useState<string>('')
 
   const pages = schema.pages || []
 
@@ -26,11 +28,13 @@ export function PageManager() {
     setEditingPageId(pageId)
     setEditName(page.name)
     setEditTitle(page.title)
+    setEditWorkflowId(page.onLoadWorkflow?.workflowId || '')
   }
 
   const handleSaveEdit = () => {
     if (!editingPageId || !editName.trim() || !editTitle.trim()) return
     updatePageMeta(editingPageId, { name: editName.trim(), title: editTitle.trim() })
+    updatePageOnLoadWorkflow(editingPageId, editWorkflowId || undefined)
     setEditingPageId(null)
   }
 
@@ -38,7 +42,10 @@ export function PageManager() {
     setEditingPageId(null)
     setEditName('')
     setEditTitle('')
+    setEditWorkflowId('')
   }
+
+  const workflows = schema.workflows || []
 
   return (
     <div className="page-manager">
@@ -75,6 +82,16 @@ export function PageManager() {
                   placeholder="页面标题"
                   className="page-input"
                 />
+                <select
+                  value={editWorkflowId}
+                  onChange={e => setEditWorkflowId(e.target.value)}
+                  className="page-input"
+                >
+                  <option value="">无页面加载工作流</option>
+                  {workflows.map(wf => (
+                    <option key={wf.id} value={wf.id}>{wf.name}</option>
+                  ))}
+                </select>
                 <div className="page-edit-actions">
                   <button onClick={handleSaveEdit} className="btn-save">保存</button>
                   <button onClick={handleCancelEdit} className="btn-cancel">取消</button>
