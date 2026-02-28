@@ -1,4 +1,4 @@
-import type { WFPSchema, WFPActionNode, WFPConditionNode, WFPParallelNode } from '@forgestudio/workflow-protocol'
+import type { WFPSchema, WFPActionNode, WFPConditionNode, WFPParallelNode, WFPLoopNode, WFPWaitNode, WFPSubprocessNode } from '@forgestudio/workflow-protocol'
 import { getEdgesByNode } from '@forgestudio/workflow-protocol'
 
 export interface WorkflowHandler {
@@ -88,6 +88,32 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
 
       // Continue after convergence
       if (convergence) visit(convergence, indent, stopAt)
+    } else if (node.type === 'loop') {
+      const loopNode = node as WFPLoopNode
+      const collection = loopNode.collection || 'items'
+      const itemVar = loopNode.itemVar || 'item'
+      const indexVar = loopNode.indexVar
+      const outEdges = getEdgesByNode(schema, nodeId, 'outgoing')
+
+      if (indexVar) {
+        lines.push(`${pad}for (let ${indexVar} = 0; ${indexVar} < ${collection}.length; ${indexVar}++) {`)
+        lines.push(`${pad}  const ${itemVar} = ${collection}[${indexVar}]`)
+      } else {
+        lines.push(`${pad}for (const ${itemVar} of ${collection}) {`)
+      }
+
+      const loopBodyVisited = new Set<string>()
+      for (const edge of outEdges) {
+        collectBranchCode(edge.target, indent + 1, undefined, lines, loopBodyVisited)
+      }
+
+      lines.push(`${pad}}`)
+
+      // Continue after loop
+      for (const edge of outEdges) {
+        const afterLoop = findLoopExit(schema, edge.target, loopBodyVisited)
+        if (afterLoop) visit(afterLoop, indent, stopAt)
+      }
     }
   }
 
@@ -192,6 +218,27 @@ function findMultiBranchConvergence(schema: WFPSchema, branchTargets: string[]):
     for (const e of getEdgesByNode(schema, id, 'outgoing')) queue.push(e.target)
   }
 
+  return undefined
+}
+
+/**
+ * Find the first node reachable from loopBodyStart that is NOT in loopBodyVisited.
+ * This identifies where execution continues after the loop.
+ */
+function findLoopExit(
+  schema: WFPSchema,
+  loopBodyStart: string,
+  loopBodyVisited: Set<string>
+): string | undefined {
+  const queue = [loopBodyStart]
+  const seen = new Set<string>()
+  while (queue.length) {
+    const id = queue.shift()!
+    if (seen.has(id)) continue
+    seen.add(id)
+    if (!loopBodyVisited.has(id)) return id
+    for (const e of getEdgesByNode(schema, id, 'outgoing')) queue.push(e.target)
+  }
   return undefined
 }
 

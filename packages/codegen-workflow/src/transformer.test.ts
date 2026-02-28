@@ -261,4 +261,32 @@ describe('transformWorkflowToHandler', () => {
     const toastIndex = body.indexOf('Taro.showToast')
     expect(toastIndex).toBeGreaterThan(promiseIndex)
   })
+
+  it('generates for...of loop for loop node', () => {
+    const wf = createWorkflow('loopFlow', 'data-orchestration')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const loopNode = createNode('loop', '遍历列表', { x: 200, y: 200 })
+    ;(loopNode as any).collection = 'items'
+    ;(loopNode as any).itemVar = 'item'
+
+    const bodyNode = createNode('action', '处理单项', { x: 200, y: 350 }) as WFPActionNode
+    ;(bodyNode as any).actionType = 'showToast'
+    ;(bodyNode as any).config = { title: '处理中' }
+
+    wf.nodes.push(loopNode, bodyNode)
+    wf.edges.push(
+      createEdge(startNode.id, loopNode.id),
+      createEdge(loopNode.id, bodyNode.id),
+      createEdge(bodyNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('for (const item of items)')
+    expect(result.body).toContain('Taro.showToast')
+    const forIndex = result.body.indexOf('for (const item of items)')
+    const toastIndex = result.body.indexOf('Taro.showToast')
+    expect(toastIndex).toBeGreaterThan(forIndex)
+  })
 })
