@@ -172,8 +172,38 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
       for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
         collectBranchCode(edge.target, indent, stopAt, branchLines, branchVisited)
       }
+    } else if (node.type === 'condition') {
+      const condNode = node as WFPConditionNode
+      const outEdges = getEdgesByNode(schema, nodeId, 'outgoing')
+      const trueEdge = outEdges.find(e => e.condition === 'true' || e.label === 'true')
+      const falseEdge = outEdges.find(e => e.condition === 'false' || e.label === 'false')
+      const convergence =
+        trueEdge && falseEdge
+          ? findConvergence(schema, trueEdge.target, falseEdge.target)
+          : undefined
+
+      branchLines.push(`${pad}if (${condNode.expression}) {`)
+      if (trueEdge) collectBranchCode(trueEdge.target, indent + 1, convergence, branchLines, new Set(branchVisited))
+      branchLines.push(`${pad}} else {`)
+      if (falseEdge) collectBranchCode(falseEdge.target, indent + 1, convergence, branchLines, new Set(branchVisited))
+      branchLines.push(`${pad}}`)
+      if (convergence) collectBranchCode(convergence, indent, stopAt, branchLines, branchVisited)
+    } else if (node.type === 'loop') {
+      const loopNode = node as WFPLoopNode
+      const collection = loopNode.collection || 'items'
+      const itemVar = loopNode.itemVar || 'item'
+      branchLines.push(`${pad}for (const ${itemVar} of ${collection}) {`)
+      const loopBodyVisited = new Set<string>()
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        collectBranchCode(edge.target, indent + 1, stopAt, branchLines, loopBodyVisited)
+      }
+      branchLines.push(`${pad}}`)
+    } else {
+      branchLines.push(`${pad}// ⚠ 节点类型 "${node.type}" 暂不支持代码生成`)
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        collectBranchCode(edge.target, indent, stopAt, branchLines, branchVisited)
+      }
     }
-    // Note: nested condition/parallel in branches not supported in Phase 1
   }
 
   for (const edge of getEdgesByNode(schema, startNode.id, 'outgoing')) {

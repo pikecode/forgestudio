@@ -386,4 +386,54 @@ describe('transformWorkflowToHandler', () => {
     const result = transformWorkflowToHandler(wf)
     expect(result.body).toContain('// ⚠ 节点类型 "custom" 暂不支持代码生成')
   })
+
+  it('handles nested condition inside parallel branch', () => {
+    const wf = createWorkflow('nestedFlow', 'data-orchestration')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const parallelNode = createNode('parallel', '并行', { x: 200, y: 100 })
+
+    // Branch A: condition node inside parallel
+    const condNode = createNode('condition', '判断', { x: 100, y: 250 })
+    ;(condNode as any).expression = 'flag'
+
+    const trueAction = createNode('action', '真分支', { x: 50, y: 400 }) as WFPActionNode
+    ;(trueAction as any).actionType = 'showToast'
+    ;(trueAction as any).config = { title: '真' }
+
+    const falseAction = createNode('action', '假分支', { x: 150, y: 400 }) as WFPActionNode
+    ;(falseAction as any).actionType = 'showToast'
+    ;(falseAction as any).config = { title: '假' }
+
+    // Branch B: simple action
+    const branchBAction = createNode('action', 'B分支', { x: 300, y: 250 }) as WFPActionNode
+    ;(branchBAction as any).actionType = 'showToast'
+    ;(branchBAction as any).config = { title: 'B' }
+
+    // Convergence after parallel
+    const finalAction = createNode('action', '最终', { x: 200, y: 500 }) as WFPActionNode
+    ;(finalAction as any).actionType = 'showToast'
+    ;(finalAction as any).config = { title: '完成' }
+
+    wf.nodes.push(parallelNode, condNode, trueAction, falseAction, branchBAction, finalAction)
+    wf.edges.push(
+      createEdge(startNode.id, parallelNode.id),
+      createEdge(parallelNode.id, condNode.id),
+      createEdge(parallelNode.id, branchBAction.id),
+      { ...createEdge(condNode.id, trueAction.id), condition: 'true', label: 'true' },
+      { ...createEdge(condNode.id, falseAction.id), condition: 'false', label: 'false' },
+      createEdge(trueAction.id, finalAction.id),
+      createEdge(falseAction.id, finalAction.id),
+      createEdge(branchBAction.id, finalAction.id),
+      createEdge(finalAction.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('Promise.all')
+    expect(result.body).toContain('if (flag)')
+    expect(result.body).toContain('"真"')
+    expect(result.body).toContain('"假"')
+    expect(result.body).toContain('"B"')
+  })
 })
