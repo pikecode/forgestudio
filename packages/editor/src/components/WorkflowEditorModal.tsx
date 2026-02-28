@@ -49,10 +49,12 @@ export function WorkflowEditorModal() {
     }}>
       <div style={{
         background: '#fff', borderRadius: 8, padding: 20,
-        width: '80vw', maxWidth: 1000,
+        width: '85vw', height: '80vh',
+        maxWidth: 1200,
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+        display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>流程编辑器 — {localWorkflow.name}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -69,8 +71,10 @@ export function WorkflowEditorModal() {
             </button>
           </div>
         </div>
-        <React.Suspense fallback={<div style={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>加载流程编辑器...</div>}>
-          <WorkflowEditorLazy value={localWorkflow} onChange={setLocalWorkflow} height={560} />
+        <React.Suspense fallback={<div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>加载流程编辑器...</div>}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+            <WorkflowEditorLazy value={localWorkflow} onChange={setLocalWorkflow} />
+          </div>
         </React.Suspense>
       </div>
     </div>
