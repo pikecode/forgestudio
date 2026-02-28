@@ -332,4 +332,22 @@ describe('transformWorkflowToHandler', () => {
     expect(result.body).toContain('userConfirm')
     expect(result.body).toContain('// 等待事件')
   })
+
+  it('generates await call for subprocess node', () => {
+    const wf = createWorkflow('subFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const subNode = createNode('subprocess', '调用子流程', { x: 200, y: 200 })
+    ;(subNode as any).workflowId = 'LoadUserProfile'
+
+    wf.nodes.push(subNode)
+    wf.edges.push(
+      createEdge(startNode.id, subNode.id),
+      createEdge(subNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('await handleLoadUserProfile()')
+  })
 })

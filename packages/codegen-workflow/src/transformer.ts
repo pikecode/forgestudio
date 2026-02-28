@@ -126,6 +126,22 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
       for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
         visit(edge.target, indent, stopAt)
       }
+    } else if (node.type === 'subprocess') {
+      const subNode = node as WFPSubprocessNode
+      const handlerName = 'handle' + capitalize(toCamelCase(subNode.workflowId))
+
+      if (subNode.inputMapping && Object.keys(subNode.inputMapping).length > 0) {
+        const args = Object.entries(subNode.inputMapping)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ')
+        lines.push(`${pad}await ${handlerName}({ ${args} })`)
+      } else {
+        lines.push(`${pad}await ${handlerName}()`)
+      }
+
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        visit(edge.target, indent, stopAt)
+      }
     }
   }
 
