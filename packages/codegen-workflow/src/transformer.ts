@@ -142,6 +142,11 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
       for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
         visit(edge.target, indent, stopAt)
       }
+    } else {
+      lines.push(`${pad}// ⚠ 节点类型 "${node.type}" 暂不支持代码生成`)
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        visit(edge.target, indent, stopAt)
+      }
     }
   }
 

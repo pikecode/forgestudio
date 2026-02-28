@@ -369,4 +369,21 @@ describe('transformWorkflowToHandler', () => {
     const result = transformWorkflowToHandler(wf)
     expect(result.body).toContain('await handleSendNotification()')
   })
+
+  it('generates warning comment for unknown node type', () => {
+    const wf = createWorkflow('unknownFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    // Manually inject an unknown node type
+    const unknownNode = { id: 'u1', type: 'custom' as any, label: '自定义', position: { x: 0, y: 0 } }
+    wf.nodes.push(unknownNode as any)
+    wf.edges.push(
+      createEdge(startNode.id, 'u1'),
+      createEdge('u1', endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('// ⚠ 节点类型 "custom" 暂不支持代码生成')
+  })
 })
