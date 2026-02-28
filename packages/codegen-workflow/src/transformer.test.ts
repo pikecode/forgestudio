@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { transformWorkflowToHandler } from './transformer'
 import { createWorkflow, createNode, createEdge } from '@forgestudio/workflow-protocol'
-import type { WFPActionNode } from '@forgestudio/workflow-protocol'
+import type { WFPActionNode, WFPWaitNode } from '@forgestudio/workflow-protocol'
 
 describe('transformWorkflowToHandler', () => {
   it('generates async function body for showToast action', () => {
@@ -288,5 +288,48 @@ describe('transformWorkflowToHandler', () => {
     const forIndex = result.body.indexOf('for (const item of items)')
     const toastIndex = result.body.indexOf('Taro.showToast')
     expect(toastIndex).toBeGreaterThan(forIndex)
+  })
+
+  it('generates delay for wait node with duration', () => {
+    const wf = createWorkflow('waitFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const waitNode = createNode('wait', '等待2秒', { x: 200, y: 200 })
+    ;(waitNode as any).duration = 2000
+
+    const afterNode = createNode('action', '提示', { x: 200, y: 350 }) as WFPActionNode
+    ;(afterNode as any).actionType = 'showToast'
+    ;(afterNode as any).config = { title: '等待完成' }
+
+    wf.nodes.push(waitNode, afterNode)
+    wf.edges.push(
+      createEdge(startNode.id, waitNode.id),
+      createEdge(waitNode.id, afterNode.id),
+      createEdge(afterNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('await new Promise(resolve => setTimeout(resolve, 2000))')
+    expect(result.body).toContain('Taro.showToast')
+  })
+
+  it('generates event comment for wait node with event', () => {
+    const wf = createWorkflow('waitEventFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const waitNode = createNode('wait', '等待确认', { x: 200, y: 200 })
+    ;(waitNode as any).event = 'userConfirm'
+
+    wf.nodes.push(waitNode)
+    wf.edges.push(
+      createEdge(startNode.id, waitNode.id),
+      createEdge(waitNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('userConfirm')
+    expect(result.body).toContain('// 等待事件')
   })
 })

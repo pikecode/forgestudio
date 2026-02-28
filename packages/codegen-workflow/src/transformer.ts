@@ -114,6 +114,18 @@ export function transformWorkflowToHandler(schema: WFPSchema): WorkflowHandler {
         const afterLoop = findLoopExit(schema, edge.target, loopBodyVisited)
         if (afterLoop) visit(afterLoop, indent, stopAt)
       }
+    } else if (node.type === 'wait') {
+      const waitNode = node as WFPWaitNode
+      if (waitNode.duration) {
+        lines.push(`${pad}await new Promise(resolve => setTimeout(resolve, ${waitNode.duration}))`)
+      } else if (waitNode.event) {
+        lines.push(`${pad}// 等待事件: ${waitNode.event}（需在运行时订阅事件后 resolve）`)
+      } else {
+        lines.push(`${pad}// 等待节点（未配置 duration 或 event）`)
+      }
+      for (const edge of getEdgesByNode(schema, nodeId, 'outgoing')) {
+        visit(edge.target, indent, stopAt)
+      }
     }
   }
 
