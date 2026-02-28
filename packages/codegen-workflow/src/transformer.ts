@@ -319,6 +319,21 @@ function generateActionLines(node: WFPActionNode, pad: string): string[] {
     ]
   }
 
+  if (actionType === 'executeWorkflow') {
+    const workflowId = String(config.workflowId ?? '')
+    if (!workflowId) {
+      return [`${pad}// ⚠ executeWorkflow: workflowId 未配置`]
+    }
+    const handlerName = 'handle' + capitalize(toCamelCase(workflowId))
+    if (config.inputMapping && typeof config.inputMapping === 'object') {
+      const args = Object.entries(config.inputMapping as Record<string, string>)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ')
+      return [`${pad}await ${handlerName}({ ${args} })`]
+    }
+    return [`${pad}await ${handlerName}()`]
+  }
+
   return [`${pad}// TODO: unknown action type "${actionType}"`]
 }
 

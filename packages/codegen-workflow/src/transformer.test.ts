@@ -350,4 +350,23 @@ describe('transformWorkflowToHandler', () => {
     const result = transformWorkflowToHandler(wf)
     expect(result.body).toContain('await handleLoadUserProfile()')
   })
+
+  it('generates await call for executeWorkflow action', () => {
+    const wf = createWorkflow('triggerFlow', 'interaction')
+    const startNode = wf.nodes.find(n => n.type === 'start')!
+    const endNode = wf.nodes.find(n => n.type === 'end')!
+
+    const actionNode = createNode('action', '执行子流程', { x: 200, y: 200 }) as WFPActionNode
+    ;(actionNode as any).actionType = 'executeWorkflow'
+    ;(actionNode as any).config = { workflowId: 'SendNotification' }
+
+    wf.nodes.push(actionNode)
+    wf.edges.push(
+      createEdge(startNode.id, actionNode.id),
+      createEdge(actionNode.id, endNode.id),
+    )
+
+    const result = transformWorkflowToHandler(wf)
+    expect(result.body).toContain('await handleSendNotification()')
+  })
 })

@@ -496,6 +496,10 @@ ${dataObj}
 
           return ''
         }
+        case 'executeWorkflow': {
+          const handlerName = 'handle' + action.workflowId.charAt(0).toUpperCase() + action.workflowId.slice(1)
+          return `await ${handlerName}()`
+        }
         default:
           return ''
       }
